@@ -1,0 +1,10 @@
+# Dart / pub
+.dart_tool/
+.packages
+pubspec.lock
+build/
+doc/api/
+
+# Never commit secrets
+.env
+*.key
