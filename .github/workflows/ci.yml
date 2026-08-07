@@ -17,6 +17,7 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
+      - run: sh scripts/truthcheck.sh
       - run: dart pub get
       - run: dart analyze
       - run: dart test
