@@ -195,6 +195,277 @@ void main() {
     });
   });
 
+  group('new filters', () {
+    test('players is sent as a repeated player parameter', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(liveMatchesPage);
+      });
+      await client.listMatches(players: [101, 102], country: 'ned');
+      expect(seen.url.queryParametersAll['player'], ['101', '102']);
+      expect(seen.url.queryParameters['country'], 'ned');
+      client.close();
+    });
+
+    test('from/to and coverage reach /history/matches', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok('{"data": []}');
+      });
+      await client.listCompletedMatches(
+        tour: Tour.juniors,
+        from: '2026-08-01',
+        to: '2026-08-07',
+        coverage: 'from_start',
+      );
+      expect(seen.url.path, '/api/public/v1/history/matches');
+      expect(seen.url.queryParameters['tour'], 'juniors');
+      expect(seen.url.queryParameters['from'], '2026-08-01');
+      expect(seen.url.queryParameters['to'], '2026-08-07');
+      expect(seen.url.queryParameters['coverage'], 'from_start');
+      client.close();
+    });
+  });
+
+  group('1.1 endpoints', () {
+    test('getMatchTape defaults to the raw sequence (no parameter)', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(tapeBody);
+      });
+      final tape = await client.getMatchTape(24101);
+      expect(seen.url.path, '/api/public/v1/history/matches/24101');
+      expect(seen.url.queryParameters.containsKey('sequence'), isFalse);
+      expect(tape!.tape.length, 3);
+      client.close();
+    });
+
+    test('getMatchTape sequence: clean is sent on the wire', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(tapeBody);
+      });
+      final tape =
+          await client.getMatchTape(24101, sequence: TapeSequence.clean);
+      expect(seen.url.queryParameters['sequence'], 'clean');
+      expect(tape!.tape[1].pointWinner, 1);
+      client.close();
+    });
+
+    test('getHeadToHead sends both name fragments', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(h2hBody);
+      });
+      final h2h = await client.getHeadToHead(p1: 'player o', p2: 'player t');
+      expect(seen.url.path, '/api/public/v1/h2h');
+      expect(seen.url.queryParameters['p1'], 'player o');
+      expect(h2h!.totals!.meetings, 5);
+      client.close();
+    });
+
+    test('listRankings listing mode sends system, not player', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(rankingsListingPage);
+      });
+      final page = await client.listRankings(systems: [RankingSystem.atp]);
+      expect(seen.url.path, '/api/public/v1/rankings');
+      expect(seen.url.queryParametersAll['system'], ['atp']);
+      expect(seen.url.queryParameters.containsKey('player'), isFalse);
+      expect(page[0].previousRank, 2);
+      client.close();
+    });
+
+    test('listRankings per-player mode repeats player and passes as_of',
+        () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok('{"data": []}');
+      });
+      await client.listRankings(
+        players: [501, 502],
+        asOf: '2026-08-03',
+        systems: [RankingSystem.itfMen, RankingSystem.utr],
+      );
+      expect(seen.url.queryParametersAll['player'], ['501', '502']);
+      expect(seen.url.queryParametersAll['system'], ['itf_mt', 'utr']);
+      expect(seen.url.queryParameters['as_of'], '2026-08-03');
+      client.close();
+    });
+
+    test('getWsToken decodes the channel vocabulary', () async {
+      final client = clientWith((req) async => _ok(wsTokenBody));
+      final token = await client.getWsToken();
+      expect(token!.channels!.slate, 'slate:all');
+      expect(token.matchChannel(7), 'match:7');
+      client.close();
+    });
+
+    test('listHistoryPackages omits the default kind and sends year',
+        () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(packagesPage);
+      });
+      await client.listHistoryPackages(year: '2025');
+      expect(seen.url.path, '/api/public/v1/history/packages');
+      expect(seen.url.queryParameters.containsKey('kind'), isFalse);
+      expect(seen.url.queryParameters['year'], '2025');
+      client.close();
+    });
+
+    test('archive, rally and charting requests hit their paths', () async {
+      final paths = <String>[];
+      final client = clientWith((req) async {
+        paths.add(req.url.path);
+        return _ok('{"data": []}');
+      });
+      await client.listArchiveMatches(tour: ArchiveTour.wta, name: 'graf');
+      await client.listArchivePlayers(name: 'graf');
+      await client.listRallyMatches(gender: 'W');
+      expect(paths, [
+        '/api/public/v1/history/archive/matches',
+        '/api/public/v1/history/archive/players',
+        '/api/public/v1/rally/matches',
+      ]);
+      client.close();
+    });
+  });
+
+  group('tier attribution', () {
+    Future<String?> tierFor(Future<void> Function(LiveTennisApi) call) async {
+      final client = clientWith(
+        (req) async => http.Response(upgradeRequiredBody, 403),
+      );
+      try {
+        await call(client);
+        fail('expected UpgradeRequiredException');
+      } on UpgradeRequiredException catch (e) {
+        return e.requiredTier;
+      } finally {
+        client.close();
+      }
+    }
+
+    test('rankings listing mode is PRO, per-player mode is ULTRA', () async {
+      expect(
+        await tierFor((c) => c.listRankings(systems: [RankingSystem.atp])),
+        'PRO',
+      );
+      expect(await tierFor((c) => c.listRankings(players: [501])), 'ULTRA');
+    });
+
+    test('statistics, rally-by-match-id, charting and ws-token are ULTRA',
+        () async {
+      expect(await tierFor((c) => c.getMatchStatistics(1)), 'ULTRA');
+      // /history/matches/{id}/rally must resolve to ULTRA, not BASIC.
+      expect(await tierFor((c) => c.getMatchRally(1)), 'ULTRA');
+      expect(await tierFor((c) => c.getChartingPlayer('federer')), 'ULTRA');
+      expect(await tierFor((c) => c.getWsToken()), 'ULTRA');
+    });
+
+    test('h2h and the archive are BASIC; packages are PRO', () async {
+      expect(
+        await tierFor((c) => c.getHeadToHead(p1: 'one', p2: 'two')),
+        'BASIC',
+      );
+      expect(await tierFor((c) => c.listArchiveMatches()), 'BASIC');
+      expect(await tierFor((c) => c.listHistoryPackages()), 'PRO');
+      expect(
+        await tierFor(
+            (c) => c.listHistoryPackages(kind: PackageKind.rankings)),
+        'ULTRA',
+      );
+    });
+
+    test('listMatches(status: completed) is attributed to BASIC', () async {
+      expect(
+        await tierFor((c) => c.listMatches(status: MatchStatus.completed)),
+        'BASIC',
+      );
+    });
+  });
+
+  group('429 shapes', () {
+    test('a daily 429 surfaces scope, limit_per_day and resets_at', () async {
+      final client = clientWith(
+        (req) async => http.Response(dailyLimitBody, 429),
+      );
+      try {
+        await client.listMatches();
+        fail('expected RateLimitedException');
+      } on RateLimitedException catch (e) {
+        expect(e.scope, 'day');
+        expect(e.limitPerDay, 100);
+        expect(e.resetsAt, DateTime.utc(2026, 8, 7, 21));
+        expect(e.toString(), contains('resets at'));
+      }
+      client.close();
+    });
+
+    test('abuse_throttled throws AbuseThrottledException with retryAtEpoch',
+        () async {
+      final client = clientWith(
+        (req) async => http.Response(abuseThrottledBody, 429),
+      );
+      try {
+        await client.listMatches();
+        fail('expected AbuseThrottledException');
+      } on AbuseThrottledException catch (e) {
+        expect(e.code, 'abuse_throttled');
+        expect(e.retryAtEpoch, 1754650800);
+        expect(e.retryAt!.isUtc, isTrue);
+        expect(e.toString(), contains('retry loop'));
+      }
+      client.close();
+    });
+
+    test('abuse_throttled is never auto-retried, even with retries budgeted',
+        () async {
+      var calls = 0;
+      final client = clientWith(
+        (req) async {
+          calls++;
+          return http.Response(abuseThrottledBody, 429);
+        },
+        maxRetries: 3,
+      );
+      await expectLater(
+        client.listMatches(),
+        throwsA(isA<AbuseThrottledException>()),
+      );
+      expect(calls, 1);
+      client.close();
+    });
+
+    test('an ordinary 429 is still retried within budget', () async {
+      var calls = 0;
+      final client = clientWith(
+        (req) async {
+          calls++;
+          return calls == 1
+              ? http.Response('{"error":"rate_limited"}', 429,
+                  headers: {'retry-after': '0'})
+              : _ok(liveMatchesPage);
+        },
+        maxRetries: 1,
+      );
+      final page = await client.listMatches();
+      expect(page.length, 1);
+      expect(calls, 2);
+      client.close();
+    });
+  });
+
   group('pagination', () {
     test('paginate walks pages and stops on a short page', () async {
       List<Map<String, dynamic>> matchList(List<int> ids) => [
