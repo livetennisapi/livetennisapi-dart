@@ -1,8 +1,13 @@
 # livetennisapi
 
+[![CI](https://github.com/livetennisapi/livetennisapi-dart/actions/workflows/ci.yml/badge.svg)](https://github.com/livetennisapi/livetennisapi-dart/actions/workflows/ci.yml)
+[![pub package](https://img.shields.io/pub/v/livetennisapi.svg)](https://pub.dev/packages/livetennisapi)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A Dart and Flutter client for the [Live Tennis API](https://livetennisapi.com) —
-real-time tennis scores, players, rankings, fixtures, match-winner market prices
-and model win-probability for ATP, WTA, Challenger and ITF, over REST.
+real-time tennis scores, players, rankings, match history, head-to-heads,
+match-winner market prices and model win-probability for ATP, WTA, Challenger,
+ITF and juniors, over REST.
 
 - **Pure Dart, Flutter-friendly.** Depends only on `package:http`; no Flutter
   dependency, so it runs in a server, a Flutter app, or on the web.
@@ -11,13 +16,14 @@ and model win-probability for ATP, WTA, Challenger and ITF, over REST.
 - **Forward-compatible.** The API ships additive changes within `v1`; unknown
   fields never break decoding and stay reachable via each model's `raw` map.
 - **Typed errors.** `UpgradeRequiredException` (403) names the tier you need;
-  `RateLimitedException` (429) carries `retryAfter`.
+  `RateLimitedException` (429) carries `retryAfter` — and `resetsAt` when the
+  daily quota is spent.
 
 ## Install
 
 ```yaml
 dependencies:
-  livetennisapi: ^1.0.0
+  livetennisapi: ^1.1.0
 ```
 
 ## Usage
@@ -32,7 +38,7 @@ Future<void> main() async {
     for (final match in page.data) {
       final s = match.score;
       final (g1, g2) = s?.gamesForSet(0) ?? (null, null);
-      print('${match.tournament}: '
+      print('${match.tournament} [${match.tour}]: '
           '${match.p1?.name} vs ${match.p2?.name} '
           '(${g1 ?? '-'}-${g2 ?? '-'}, serving: ${s?.server ?? '—'})');
     }
@@ -46,11 +52,16 @@ Future<void> main() async {
 }
 ```
 
+Get a free key at [livetennisapi.com/subscribe/free](https://livetennisapi.com/subscribe/free)
+— self-serve, no card.
+
 ### Authentication
 
 Pass your `twjp_` key to the constructor. By default it is sent as
-`Authorization: Bearer <key>`; pass `authHeader: AuthHeader.xApiKey` to use the
-`X-API-Key` header instead.
+`Authorization: Bearer <key>` (preferred); pass
+`authHeader: AuthHeader.xApiKey` to use the `X-API-Key` header instead. (The
+API also accepts `?token=` for header-less contexts such as raw WebSocket
+connections; this client always uses headers.)
 
 ```dart
 final client = LiveTennisApi(
@@ -61,12 +72,54 @@ final client = LiveTennisApi(
 );
 ```
 
-### Tiers
+## Endpoints
 
-Access is tiered (FREE / BASIC / PRO / ULTRA). Scores, players and fixtures are
-FREE; historical results need BASIC; events and market prices need PRO; model
-analysis needs ULTRA. A call above your tier throws `UpgradeRequiredException`,
-whose `requiredTier` names the plan that unlocks the endpoint.
+| Method | Endpoint | Tier |
+|---|---|---|
+| `health` | `/health` | none |
+| `listMatches` | `/matches` | FREE (`status: completed` BASIC+) |
+| `getMatch` | `/matches/{id}` | FREE (+`market` PRO, +`analysis` ULTRA) |
+| `getMatchScore` | `/matches/{id}/score` | FREE |
+| `listMatchEvents` | `/matches/{id}/events` | PRO |
+| `getMatchAnalysis` | `/matches/{id}/analysis` | ULTRA |
+| `getMatchStatistics` | `/matches/{id}/statistics` | ULTRA |
+| `searchPlayers`, `getPlayer` | `/players`, `/players/{id}` | FREE |
+| `listFixtures` | `/fixtures` | FREE |
+| `listMarkets`, `getMarketPrices` | `/markets`, `/markets/{id}/prices` | PRO |
+| `listRankings` | `/rankings` | PRO (listing) / ULTRA (per-player) |
+| `listCompletedMatches` | `/history/matches` | BASIC, or any History plan |
+| `getMatchTape` | `/history/matches/{id}` | BASIC, or any History plan |
+| `getHeadToHead` | `/h2h` | BASIC, or any History plan |
+| `listArchiveMatches`, `getArchiveMatch` | `/history/archive/matches` | BASIC, or any History plan |
+| `listArchivePlayers` | `/history/archive/players` | BASIC, or any History plan |
+| `getArchiveCareer` | `/history/archive/career` | BASIC, or any History plan |
+| `listHistoryPackages`, `getHistoryPackage` | `/history/packages` | PRO+ (`kind: rankings` / `year` ULTRA) |
+| `listRallyMatches`, `getRallyMatch` | `/rally/matches` | ULTRA |
+| `getMatchRally` | `/history/matches/{id}/rally` | ULTRA |
+| `getChartingPlayer` | `/charting/players` | ULTRA |
+| `getChartingMatch` | `/charting/matches/{id}` | ULTRA |
+| `getWsToken` | `/ws-token` | ULTRA |
+
+A call above your tier throws `UpgradeRequiredException`, whose `requiredTier`
+names the plan that unlocks the endpoint.
+
+## Quotas
+
+| Tier | Requests/min | Requests/day | Price |
+|---|---|---|---|
+| FREE | 30 | 100 | $0 |
+| BASIC | 60 | 1,000 | $9.99/mo |
+| PRO | 300 | 10,000 | $29.99/mo |
+| ULTRA | 600 | 500,000 | $99.99/mo |
+
+The FREE tier is 100 requests/day, so poll no faster than every 15 minutes on
+a free key; for an always-on dashboard, BASIC is the recommended floor. Every
+response carries `X-RateLimit-Limit` / `-Remaining` / `-Reset` headers. When
+the **daily** quota is spent, the thrown `RateLimitedException` has
+`scope == 'day'` and `resetsAt` — the absolute reset instant (derived from
+the service's local midnight, so don't assume a fixed UTC hour). An
+`AbuseThrottledException` (24-hour block for broken retry loops) is never
+auto-retried; fix the loop and wait until `retryAt`.
 
 ## Reading a score
 
@@ -81,6 +134,31 @@ final (p1, p2) = score.gamesForSet(0); // games in set 1, as (p1, p2)
 `Score.points` are strings (`"0"`, `"15"`, `"30"`, `"40"`, `"AD"`), and
 `Score.server` is `1`, `2`, or `null`.
 
+## History, head-to-head and the tape
+
+```dart
+// The point-by-point tape — works on live matches too. The clean sequence
+// carries pointWinner per attributable row, plus per-set tiebreak scores.
+final tape = await client.getMatchTape(24101, sequence: TapeSequence.clean);
+print('${tape?.meta?.coverage}: ${tape?.tape.length} rows');
+
+// Head-to-head across the archive (1968–2022) and current matches (2023→).
+final h2h = await client.getHeadToHead(p1: 'alcaraz', p2: 'sinner');
+print('${h2h?.p1Name} ${h2h?.totals?.p1Wins}–${h2h?.totals?.p2Wins} '
+    '${h2h?.p2Name}');
+
+// Point-in-time rankings (ULTRA per-player mode), with previousRank.
+final ranks = await client.listRankings(
+  players: [501],
+  asOf: '2026-08-03',
+  systems: [RankingSystem.atp],
+);
+```
+
+Tape coverage is honest, not guessed — read `MatchTape.meta` (`coverage`,
+`pointSource`) before backtesting, and note archive people live in their own
+id space, keyed by name.
+
 ## Pagination
 
 ```dart
@@ -92,11 +170,12 @@ await for (final player in client.paginate(
 }
 ```
 
-## Endpoints
+## Links
 
-`health`, `listMatches`, `getMatch`, `getMatchScore`, `listMatchEvents` (PRO),
-`getMatchAnalysis` (ULTRA), `searchPlayers`, `getPlayer`, `listMarkets` (PRO),
-`getMarketPrices` (PRO), `listCompletedMatches` (BASIC), `listFixtures`.
+- Docs: [docs.livetennisapi.com](https://docs.livetennisapi.com)
+- Free API key: [livetennisapi.com/subscribe/free](https://livetennisapi.com/subscribe/free)
+- Discord: [discord.gg/f8WUZHgDm6](https://discord.gg/f8WUZHgDm6)
+- GitHub org: [github.com/livetennisapi](https://github.com/livetennisapi)
 
 ## License
 

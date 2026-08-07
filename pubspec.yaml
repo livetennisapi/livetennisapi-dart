@@ -1,8 +1,9 @@
 name: livetennisapi
 description: >-
   Dart and Flutter client for the Live Tennis API — real-time tennis scores,
-  players, rankings and fixtures for ATP, WTA, Challenger and ITF over REST.
-version: 1.0.0
+  players, rankings, history and fixtures for ATP, WTA, Challenger, ITF and
+  juniors over REST.
+version: 1.1.0
 repository: https://github.com/livetennisapi/livetennisapi-dart
 homepage: https://livetennisapi.com
 issue_tracker: https://github.com/livetennisapi/livetennisapi-dart/issues
