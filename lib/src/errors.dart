@@ -132,12 +132,32 @@ class NotFoundException extends LiveTennisApiException {
 
 /// 429 — the tier's rate-limit window was exceeded.
 ///
+/// The API has two `rate_limited` windows, distinguishable by [scope]:
+///
+/// - **per-minute** (`scope` null): wait [retryAfter] seconds and go again.
+/// - **per-day** (`scope` == `'day'`): the day's quota ([limitPerDay]) is
+///   spent; [resetsAt] is the absolute instant it resets. The reset is
+///   derived from the service's local midnight — do not assume any
+///   particular UTC hour.
+///
 /// [retryAfter] is the number of seconds the API asked you to wait, parsed from
 /// the `Retry-After` header. It is `null` when the header is absent or
 /// unparseable.
 class RateLimitedException extends LiveTennisApiException {
   /// Seconds to wait before retrying, from the `Retry-After` header, or `null`.
   final num? retryAfter;
+
+  /// The limit scope from the body: `'day'` on a daily-quota 429, `null` on a
+  /// per-minute one.
+  final String? scope;
+
+  /// The daily quota that was exhausted, from the body's `limit_per_day`;
+  /// `null` on a per-minute 429.
+  final int? limitPerDay;
+
+  /// When the daily quota resets — the absolute instant from the body's
+  /// `resets_at`; `null` on a per-minute 429.
+  final DateTime? resetsAt;
 
   /// Creates a 429 exception.
   const RateLimitedException(
@@ -148,12 +168,54 @@ class RateLimitedException extends LiveTennisApiException {
     super.headers,
     super.url,
     this.retryAfter,
+    this.scope,
+    this.limitPerDay,
+    this.resetsAt,
   });
 
   @override
   String toString() {
     final base = super.toString();
+    if (resetsAt != null) return '$base — daily quota resets at $resetsAt';
     return retryAfter == null ? base : '$base — retry after ${retryAfter}s';
+  }
+}
+
+/// 429 `abuse_throttled` — a 24-hour block for clients that chronically run
+/// far over their cap, usually a broken retry loop.
+///
+/// This is not an ordinary rate limit: backing off for a few seconds will not
+/// clear it, so the client never auto-retries it. Fix the loop that caused it
+/// and wait until [retryAt].
+class AbuseThrottledException extends RateLimitedException {
+  /// The Unix epoch second the block lifts, from the body's `retry_at_epoch`.
+  final int? retryAtEpoch;
+
+  /// Creates an abuse-throttled exception.
+  const AbuseThrottledException(
+    super.message, {
+    super.statusCode,
+    super.code,
+    super.body,
+    super.headers,
+    super.url,
+    super.retryAfter,
+    this.retryAtEpoch,
+  });
+
+  /// [retryAtEpoch] as a UTC [DateTime], or `null`.
+  DateTime? get retryAt => retryAtEpoch == null
+      ? null
+      : DateTime.fromMillisecondsSinceEpoch(retryAtEpoch! * 1000, isUtc: true);
+
+  @override
+  String toString() {
+    final base = 'AbuseThrottledException: [$statusCode] $message'
+        '${url == null ? '' : ' ($url)'}';
+    final at = retryAt;
+    return at == null
+        ? '$base — fix the retry loop that caused this'
+        : '$base — blocked until $at; fix the retry loop that caused this';
   }
 }
 
@@ -215,12 +277,29 @@ LiveTennisApiException exceptionForStatus(
       return NotFoundException(message,
           code: code, body: body, headers: headers, url: url);
     case 429:
+      final map = body is Map ? body : const {};
+      if (code == 'abuse_throttled') {
+        final epoch = map['retry_at_epoch'];
+        return AbuseThrottledException(message,
+            code: code,
+            body: body,
+            headers: headers,
+            url: url,
+            retryAfter: retryAfter,
+            retryAtEpoch: epoch is int ? epoch : null);
+      }
+      final limitPerDay = map['limit_per_day'];
+      final resetsAt = map['resets_at'];
       return RateLimitedException(message,
           code: code,
           body: body,
           headers: headers,
           url: url,
-          retryAfter: retryAfter);
+          retryAfter: retryAfter,
+          scope: map['scope'] is String ? map['scope'] as String : null,
+          limitPerDay: limitPerDay is int ? limitPerDay : null,
+          resetsAt:
+              resetsAt is String ? DateTime.tryParse(resetsAt) : null);
     case 503:
       return ServiceUnavailableException(message,
           code: code, body: body, headers: headers, url: url);
