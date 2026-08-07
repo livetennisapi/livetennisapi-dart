@@ -130,6 +130,22 @@ class NotFoundException extends LiveTennisApiException {
   });
 }
 
+/// 409 — the request conflicts with the current state.
+///
+/// The API's known case is `webhook_limit`: the key already has the maximum
+/// of 3 webhooks, so delete one before registering another. Check [code].
+class ConflictException extends LiveTennisApiException {
+  /// Creates a 409 exception.
+  const ConflictException(
+    super.message, {
+    super.statusCode = 409,
+    super.code,
+    super.body,
+    super.headers,
+    super.url,
+  });
+}
+
 /// 429 — the tier's rate-limit window was exceeded.
 ///
 /// The API has two `rate_limited` windows, distinguishable by [scope]:
@@ -275,6 +291,9 @@ LiveTennisApiException exceptionForStatus(
           requiredTier: requiredTier);
     case 404:
       return NotFoundException(message,
+          code: code, body: body, headers: headers, url: url);
+    case 409:
+      return ConflictException(message,
           code: code, body: body, headers: headers, url: url);
     case 429:
       final map = body is Map ? body : const {};
