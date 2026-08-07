@@ -367,6 +367,55 @@ void main() {
     });
   });
 
+  group('Usage', () {
+    test('tier, limits, today and history decode; no reset instant here', () {
+      final u = Usage.fromJson(_json(usageBody));
+      expect(u.tier, 'free');
+      expect(u.baseTier, 'free');
+      expect(u.tierExpiresAt, isNull);
+      expect(u.channel, 'direct');
+      expect(u.limits!.perMinute, 30);
+      expect(u.limits!.perDay, 100);
+      expect(u.today!.calls, 41);
+      expect(u.today!.remainingDay, 59);
+      expect(u.history.length, 2);
+      expect(u.history.first.day!.day, 5);
+      expect(u.history.last.errors, 3);
+      // /usage does NOT return the daily reset instant — that exists only on
+      // the daily-429 body as resets_at.
+      expect(u.raw.containsKey('resets_at'), isFalse);
+    });
+  });
+
+  group('Tournament', () {
+    test('catalogue row decodes, incl. curated host fields and category', () {
+      final t = Tournament.fromJson(_json(tournamentBody));
+      expect(t.id, 'atp-kitzbuhel-singles');
+      expect(t.tour, 'atp');
+      expect(t.country, 'AT'); // host country, ISO-3166 alpha-2
+      expect(t.category, 'atp_250');
+    });
+  });
+
+  group('Webhook', () {
+    test('the creation response carries the secret exactly once', () {
+      final w = Webhook.fromJson(_json(webhookCreatedBody));
+      expect(w.id, 31);
+      expect(w.events, ['score', 'break_point']);
+      expect(w.enabled, isTrue);
+      expect(w.secret, 'whsec_example_shown_once');
+      expect(w.secretNote, contains('once'));
+    });
+
+    test('a listed webhook has no secret and typed delivery state', () {
+      final page = Page.fromJson(_json(webhooksListPage), Webhook.fromJson);
+      expect(page.length, 1);
+      expect(page[0].secret, isNull);
+      expect(page[0].lastDeliveryAt, isNotNull);
+      expect(page[0].consecutiveFailures, 0);
+    });
+  });
+
   group('HistoryPackage', () {
     test('a tape package decodes with files and checksums, kind null', () {
       final page = Page.fromJson(
