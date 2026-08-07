@@ -11,7 +11,7 @@ import 'errors.dart';
 import 'models.dart';
 
 /// The package version, sent in the `User-Agent` header.
-const String packageVersion = '1.1.0';
+const String packageVersion = '1.2.0';
 
 /// The default API base URL.
 const String defaultBaseUrl = 'https://api.livetennisapi.com/api/public/v1';
@@ -83,8 +83,10 @@ const List<(String, String)> _tierRequirements = [
   ('/rally', 'ULTRA'),
   ('/charting', 'ULTRA'),
   ('/ws-token', 'ULTRA'),
+  ('/webhooks', 'ULTRA'),
   ('/events', 'PRO'),
   ('/markets', 'PRO'),
+  ('/prices', 'PRO'),
   ('/history/packages', 'PRO'),
   ('/h2h', 'BASIC'),
   ('/history', 'BASIC'),
@@ -171,6 +173,20 @@ enum ArchiveTour {
 
   /// The wire value sent as the `tour` query parameter.
   String get wire => name;
+}
+
+/// An event a webhook can subscribe to.
+enum WebhookEvent {
+  /// Live score frames (the default subscription).
+  score('score'),
+
+  /// Break-point alert frames.
+  breakPoint('break_point');
+
+  const WebhookEvent(this.wire);
+
+  /// The wire value sent in the `events` array.
+  final String wire;
 }
 
 /// A read-only client for the [Live Tennis API](https://livetennisapi.com).
@@ -356,6 +372,28 @@ class LiveTennisApi {
       }
       return _decode(response);
     }
+  }
+
+  /// A mutating request (POST/DELETE). Never auto-retried: retrying a create
+  /// could duplicate the resource, so a transient failure surfaces instead.
+  Future<Object?> _mutate(
+    String method,
+    String path, {
+    Object? jsonBody,
+  }) async {
+    final uri = _uri(path);
+    final request = http.Request(method, uri);
+    request.headers.addAll(_headers());
+    if (jsonBody != null) {
+      request.headers['Content-Type'] = 'application/json';
+      request.body = jsonEncode(jsonBody);
+    }
+    final streamed = await _http.send(request).timeout(timeout);
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _throwFor(response, path, uri);
+    }
+    return _decode(response);
   }
 
   // -- endpoints --------------------------------------------------------------
@@ -869,6 +907,108 @@ class LiveTennisApi {
     return body is Map
         ? ChartingMatch.fromJson(Map<String, dynamic>.from(body))
         : null;
+  }
+
+  /// The tournament catalogue — the id space [Match.tournamentId] joins,
+  /// name order. FREE.
+  ///
+  /// [search] is a case-insensitive substring match on the tournament name.
+  Future<Page<Tournament>> listTournaments({
+    String? search,
+    Tour? tour,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final body = await _request('/tournaments', {
+      'search': search,
+      'tour': tour?.wire,
+      'limit': limit,
+      'offset': offset,
+    });
+    return Page.fromJson(body, Tournament.fromJson);
+  }
+
+  /// One tournament by its stable id — the `tournament_id` carried on match
+  /// objects. FREE.
+  Future<Tournament?> getTournament(String tournamentId) async {
+    final body = await _request('/tournaments/$tournamentId');
+    return body is Map
+        ? Tournament.fromJson(Map<String, dynamic>.from(body))
+        : null;
+  }
+
+  /// Bare price ticks of the match's mapped match-winner market, newest
+  /// first — no market wrapper. **PRO.**
+  ///
+  /// Unlike other lists there is **no offset**: [limit] caps at 500 (default
+  /// 100) and [minutes] bounds the lookback window (1–1440) — when the
+  /// page's `meta` says `has_more`, older ticks exist; raise [limit] or
+  /// narrow [minutes]. Throws [NotFoundException] when the match has no
+  /// mapped market. For the market object with its ticks, use
+  /// [getMarketPrices].
+  Future<Page<Price>> listMatchPrices(
+    int matchId, {
+    int limit = 100,
+    int? minutes,
+  }) async {
+    final body = await _request(
+      '/matches/$matchId/prices',
+      {'limit': limit, 'minutes': minutes},
+    );
+    return Page.fromJson(body, Price.fromJson);
+  }
+
+  /// Your own usage vs quota. Any tier, and the call itself is quota-exempt.
+  ///
+  /// Durable daily usage for the calling key: tier, limits, today's calls
+  /// (current to the second) and a 30-day history. The per-minute window is
+  /// on the `X-RateLimit-*` headers of every response, not here — and the
+  /// daily reset instant is **not** returned; it appears only as `resets_at`
+  /// on a daily-429 body ([RateLimitedException.resetsAt]).
+  Future<Usage?> getUsage() async {
+    final body = await _request('/usage');
+    return body is Map ? Usage.fromJson(Map<String, dynamic>.from(body)) : null;
+  }
+
+  /// Registers an outbound webhook. **ULTRA, direct keys only** (a RapidAPI
+  /// key gets a 403 `direct_key_required`).
+  ///
+  /// The API POSTs the same frames the WebSocket sends to [url] (HTTPS,
+  /// publicly routable) on every live score commit; [events] defaults to
+  /// `[score]` when omitted. Up to 3 webhooks per key — the 4th is a 409
+  /// [ConflictException] with code `webhook_limit`. The returned
+  /// [Webhook.secret] is shown **exactly once**: store it now, listings never
+  /// include it. Never auto-retried, so a transient failure cannot register a
+  /// duplicate.
+  Future<Webhook?> createWebhook({
+    required String url,
+    List<WebhookEvent>? events,
+  }) async {
+    final body = await _mutate('POST', '/webhooks', jsonBody: {
+      'url': url,
+      if (events != null) 'events': [for (final e in events) e.wire],
+    });
+    return body is Map
+        ? Webhook.fromJson(Map<String, dynamic>.from(body))
+        : null;
+  }
+
+  /// Lists your webhooks. **ULTRA, direct keys only.** Never includes the
+  /// signing secret — that is shown only on creation.
+  Future<Page<Webhook>> listWebhooks() async {
+    final body = await _request('/webhooks');
+    return Page.fromJson(body, Webhook.fromJson);
+  }
+
+  /// Removes one of your webhooks. **ULTRA, direct keys only.**
+  ///
+  /// Returns the deleted count from the response (`1` on success), or `null`
+  /// when the body carried none.
+  Future<int?> deleteWebhook(int webhookId) async {
+    final body = await _mutate('DELETE', '/webhooks/$webhookId');
+    if (body is! Map) return null;
+    final deleted = body['deleted'];
+    return deleted is int ? deleted : null;
   }
 
   // -- pagination -------------------------------------------------------------
