@@ -341,6 +341,137 @@ void main() {
     });
   });
 
+  group('1.2 endpoints', () {
+    test('getUsage decodes the quota summary', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(usageBody);
+      });
+      final usage = await client.getUsage();
+      expect(seen.url.path, '/api/public/v1/usage');
+      expect(usage!.tier, 'free');
+      expect(usage.limits!.perDay, 100);
+      expect(usage.today!.remainingDay, 59);
+      client.close();
+    });
+
+    test('tournaments: listing filters and single lookup by stable id',
+        () async {
+      final requests = <http.Request>[];
+      final client = clientWith((req) async {
+        requests.add(req);
+        return req.url.path.endsWith('/tournaments')
+            ? _ok(tournamentsPage)
+            : _ok(tournamentBody);
+      });
+      final page = await client.listTournaments(search: 'kitz', tour: Tour.atp);
+      expect(page[0].category, 'atp_250');
+      expect(requests[0].url.queryParameters['search'], 'kitz');
+      final t = await client.getTournament('atp-kitzbuhel-singles');
+      expect(
+        requests[1].url.path,
+        '/api/public/v1/tournaments/atp-kitzbuhel-singles',
+      );
+      expect(t!.country, 'AT');
+      client.close();
+    });
+
+    test('listMatchPrices sends limit/minutes and decodes bare ticks',
+        () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(matchPricesPage);
+      });
+      final page = await client.listMatchPrices(22313, limit: 2, minutes: 60);
+      expect(seen.url.path, '/api/public/v1/matches/22313/prices');
+      expect(seen.url.queryParameters['limit'], '2');
+      expect(seen.url.queryParameters['minutes'], '60');
+      expect(page.length, 2);
+      expect(page[0].mid, 0.62);
+      expect(page.meta!.hasMore, isTrue); // clipped window, not end-of-data
+      client.close();
+    });
+
+    test('createWebhook POSTs a JSON body and returns the one-time secret',
+        () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return http.Response(webhookCreatedBody, 201,
+            headers: {'content-type': 'application/json'});
+      });
+      final hook = await client.createWebhook(
+        url: 'https://example.invalid/hooks/tennis',
+        events: [WebhookEvent.score, WebhookEvent.breakPoint],
+      );
+      expect(seen.method, 'POST');
+      expect(seen.url.path, '/api/public/v1/webhooks');
+      expect(seen.headers['Content-Type'], contains('application/json'));
+      expect(jsonDecode(seen.body), {
+        'url': 'https://example.invalid/hooks/tennis',
+        'events': ['score', 'break_point'],
+      });
+      expect(hook!.secret, 'whsec_example_shown_once');
+      client.close();
+    });
+
+    test('createWebhook omits events so the server default applies',
+        () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return http.Response(webhookCreatedBody, 201);
+      });
+      await client.createWebhook(url: 'https://example.invalid/h');
+      expect(
+        (jsonDecode(seen.body) as Map).containsKey('events'),
+        isFalse,
+      );
+      client.close();
+    });
+
+    test('listWebhooks GETs the collection (no secret in rows)', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(webhooksListPage);
+      });
+      final page = await client.listWebhooks();
+      expect(seen.method, 'GET');
+      expect(page[0].secret, isNull);
+      client.close();
+    });
+
+    test('deleteWebhook sends DELETE and returns the deleted count',
+        () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok('{"deleted": 1}');
+      });
+      final deleted = await client.deleteWebhook(31);
+      expect(seen.method, 'DELETE');
+      expect(seen.url.path, '/api/public/v1/webhooks/31');
+      expect(deleted, 1);
+      client.close();
+    });
+
+    test('a 4th webhook is a 409 ConflictException with webhook_limit',
+        () async {
+      final client = clientWith(
+        (req) async => http.Response(webhookLimitBody, 409),
+      );
+      await expectLater(
+        client.createWebhook(url: 'https://example.invalid/h'),
+        throwsA(isA<ConflictException>()
+            .having((e) => e.code, 'code', 'webhook_limit')),
+      );
+      client.close();
+    });
+  });
+
   group('tier attribution', () {
     Future<String?> tierFor(Future<void> Function(LiveTennisApi) call) async {
       final client = clientWith(
@@ -371,6 +502,11 @@ void main() {
       expect(await tierFor((c) => c.getMatchRally(1)), 'ULTRA');
       expect(await tierFor((c) => c.getChartingPlayer('federer')), 'ULTRA');
       expect(await tierFor((c) => c.getWsToken()), 'ULTRA');
+      expect(await tierFor((c) => c.listWebhooks()), 'ULTRA');
+    });
+
+    test('bare match price ticks are PRO', () async {
+      expect(await tierFor((c) => c.listMatchPrices(1)), 'PRO');
     });
 
     test('h2h and the archive are BASIC; packages are PRO', () async {

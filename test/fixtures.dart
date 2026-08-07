@@ -362,3 +362,93 @@ const String packagesPage = '''
   "meta": {"count": 1}
 }
 ''';
+
+/// A usage body: FREE-tier key with a temporary grant absent, today's calls
+/// and a short history. NOTE it carries no `resets_at` — the daily reset
+/// instant appears only on the daily-429 body.
+const String usageBody = '''
+{
+  "principal": "key_ab12cd",
+  "tier": "free",
+  "base_tier": "free",
+  "tier_expires_at": null,
+  "channel": "direct",
+  "limits": {"per_minute": 30, "per_day": 100},
+  "today": {"calls": 41, "errors": 2, "remaining_day": 59},
+  "history": [
+    {"day": "2026-08-05", "calls": 97, "errors": 0},
+    {"day": "2026-08-06", "calls": 100, "errors": 3}
+  ],
+  "as_of": "2026-08-07T09:30:00Z"
+}
+''';
+
+/// A tournament row from the catalogue, with curated host city/country
+/// (ISO-3166 alpha-2, unlike player country codes) and an agreed category.
+const String tournamentBody = '''
+{
+  "id": "atp-kitzbuhel-singles",
+  "name": "Kitzbuhel",
+  "tour": "atp",
+  "surface": "clay",
+  "indoor": false,
+  "city": "Kitzbuhel",
+  "country": "AT",
+  "category": "atp_250"
+}
+''';
+
+/// A `{data, meta}` tournaments page wrapping the single row.
+const String tournamentsPage = '''
+{"data": [$tournamentBody], "meta": {"limit": 50, "offset": 0, "count": 1}}
+''';
+
+/// Bare price ticks from /matches/{id}/prices: no market wrapper, no offset,
+/// `has_more` marks a clipped window.
+const String matchPricesPage = '''
+{
+  "data": [
+    {"side": 1, "bid": 0.61, "ask": 0.63, "mid": 0.62, "spread": 0.02,
+     "price_source": "prediction_market", "synthetic": false,
+     "timestamp": "2026-08-07T09:31:00Z"},
+    {"side": 2, "mid": 0.38, "synthetic": true,
+     "timestamp": "2026-08-07T09:30:30Z"}
+  ],
+  "meta": {"match_id": 22313, "count": 2, "has_more": true, "limit": 2,
+           "minutes": null}
+}
+''';
+
+/// The 201 body of a webhook registration — the ONLY response that carries
+/// the signing secret.
+const String webhookCreatedBody = '''
+{
+  "id": 31,
+  "url": "https://example.invalid/hooks/tennis",
+  "events": ["score", "break_point"],
+  "enabled": true,
+  "created_at": "2026-08-07T09:32:00Z",
+  "last_delivery_at": null,
+  "consecutive_failures": 0,
+  "last_error": null,
+  "secret": "whsec_example_shown_once",
+  "secret_note": "Shown once. Store it now."
+}
+''';
+
+/// A webhooks listing: same shape, never the secret.
+const String webhooksListPage = '''
+{
+  "data": [
+    {"id": 31, "url": "https://example.invalid/hooks/tennis",
+     "events": ["score"], "enabled": true,
+     "created_at": "2026-08-07T09:32:00Z",
+     "last_delivery_at": "2026-08-07T09:40:11Z",
+     "consecutive_failures": 0, "last_error": null}
+  ],
+  "meta": {"count": 1}
+}
+''';
+
+/// The 409 body when a 4th webhook is registered.
+const String webhookLimitBody = '{"error": "webhook_limit"}';
