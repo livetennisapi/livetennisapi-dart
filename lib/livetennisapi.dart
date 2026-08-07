@@ -35,6 +35,7 @@ export 'src/client.dart'
         RankingSystem,
         TapeSequence,
         Tour,
+        WebhookEvent,
         defaultBaseUrl,
         packageVersion;
 export 'src/errors.dart';
