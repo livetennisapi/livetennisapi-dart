@@ -1,7 +1,8 @@
 /// A Dart client for the [Live Tennis API](https://livetennisapi.com).
 ///
 /// Real-time tennis scores, players, rankings, match-winner market prices and
-/// model win-probability for ATP, WTA, Challenger and ITF — over REST.
+/// model win-probability for ATP, WTA, Challenger, ITF and juniors — over
+/// REST.
 ///
 /// ```dart
 /// import 'package:livetennisapi/livetennisapi.dart';
@@ -26,9 +27,13 @@ library;
 
 export 'src/client.dart'
     show
+        ArchiveTour,
         AuthHeader,
         LiveTennisApi,
         MatchStatus,
+        PackageKind,
+        RankingSystem,
+        TapeSequence,
         Tour,
         defaultBaseUrl,
         packageVersion;
