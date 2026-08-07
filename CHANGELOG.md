@@ -3,6 +3,36 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.2.0 — 2026-08-07
+
+Full API parity: every documented public v1 REST path now has a typed method.
+
+### Added
+
+- `getUsage` (`/usage`, any tier and quota-exempt) → typed `Usage` with
+  `UsageLimits`, `UsageToday` and a 30-day `UsageDay` history. Note the daily
+  reset instant is **not** part of this response — it exists only as
+  `resets_at` on a daily-429 body.
+- Webhooks (ULTRA, direct keys only): `createWebhook` (POST, one-time
+  `Webhook.secret`, server-default events when omitted), `listWebhooks`
+  (never includes the secret) and `deleteWebhook`; `WebhookEvent` enum
+  (`score`, `break_point`). Max 3 per key — the 4th raises the new
+  `ConflictException` (409 `webhook_limit`). Mutating requests are never
+  auto-retried, so a transient failure cannot register a duplicate webhook.
+- Tournament catalogue: `listTournaments` / `getTournament` (FREE) → typed
+  `Tournament` (stable id joined by `Match.tournamentId`, curated host
+  city/country, category only where the catalogues agree).
+- `listMatchPrices` (`/matches/{id}/prices`, PRO): bare price ticks of the
+  mapped match-winner market — `limit` ≤ 500, `minutes` lookback window, no
+  offset (`meta.has_more` marks a clipped window).
+
+### Notes
+
+- Deliberately out of scope (documented in the README): undocumented gateway
+  alias routes, HTML views and static assets; package file downloads stream
+  as attachments and stay with your HTTP tooling (the client returns the JSON
+  manifest).
+
 ## 1.1.0 — 2026-08-07
 
 ### Added

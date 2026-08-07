@@ -23,7 +23,7 @@ ITF and juniors, over REST.
 
 ```yaml
 dependencies:
-  livetennisapi: ^1.1.0
+  livetennisapi: ^1.2.0
 ```
 
 ## Usage
@@ -74,9 +74,12 @@ final client = LiveTennisApi(
 
 ## Endpoints
 
+Full parity with the documented public v1 REST surface:
+
 | Method | Endpoint | Tier |
 |---|---|---|
 | `health` | `/health` | none |
+| `getUsage` | `/usage` | any (quota-exempt) |
 | `listMatches` | `/matches` | FREE (`status: completed` BASIC+) |
 | `getMatch` | `/matches/{id}` | FREE (+`market` PRO, +`analysis` ULTRA) |
 | `getMatchScore` | `/matches/{id}/score` | FREE |
@@ -85,7 +88,9 @@ final client = LiveTennisApi(
 | `getMatchStatistics` | `/matches/{id}/statistics` | ULTRA |
 | `searchPlayers`, `getPlayer` | `/players`, `/players/{id}` | FREE |
 | `listFixtures` | `/fixtures` | FREE |
+| `listTournaments`, `getTournament` | `/tournaments`, `/tournaments/{id}` | FREE |
 | `listMarkets`, `getMarketPrices` | `/markets`, `/markets/{id}/prices` | PRO |
+| `listMatchPrices` | `/matches/{id}/prices` | PRO |
 | `listRankings` | `/rankings` | PRO (listing) / ULTRA (per-player) |
 | `listCompletedMatches` | `/history/matches` | BASIC, or any History plan |
 | `getMatchTape` | `/history/matches/{id}` | BASIC, or any History plan |
@@ -99,9 +104,22 @@ final client = LiveTennisApi(
 | `getChartingPlayer` | `/charting/players` | ULTRA |
 | `getChartingMatch` | `/charting/matches/{id}` | ULTRA |
 | `getWsToken` | `/ws-token` | ULTRA |
+| `createWebhook`, `listWebhooks`, `deleteWebhook` | `/webhooks` | ULTRA (direct keys only) |
 
 A call above your tier throws `UpgradeRequiredException`, whose `requiredTier`
 names the plan that unlocks the endpoint.
+
+**Webhooks:** up to 3 per key (a 4th is a 409 `ConflictException`,
+`webhook_limit`); the signing secret is returned **once**, on creation.
+Webhook registration is never auto-retried, so a transient failure cannot
+create a duplicate. `getUsage` reports quota state but not the daily reset
+instant — that arrives only as `resetsAt` on a daily 429.
+
+**Deliberately excluded:** anything outside the documented public v1 JSON
+contract — undocumented gateway alias routes, server-rendered HTML views, and
+static assets (fonts, images). Package file downloads
+(`/history/packages/{period}?format=`) stream as attachments; this client
+returns the JSON manifest and leaves the download to your HTTP tooling.
 
 ## Quotas
 
