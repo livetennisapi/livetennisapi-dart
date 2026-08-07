@@ -2458,6 +2458,300 @@ class ChartingPlayer {
       );
 }
 
+/// A tournament — the stable id space [Match.tournamentId] joins.
+///
+/// One row per tournament × event type, stable across seasons. Unlike
+/// [Player.country] (IOC-style 3-letter), [country] here is the **host**
+/// country as ISO-3166 alpha-2, from a curated table. [category] is set only
+/// where the catalogues agree unambiguously on an exact-name join — `null`
+/// otherwise, never derived from the name.
+class Tournament {
+  /// The stable tournament id ([Match.tournamentId] joins this).
+  final String? id;
+
+  /// Tournament name, or `null`.
+  final String? name;
+
+  /// The tour, in the filter vocabulary (`atp`, `wta`, `challenger`, `itf`,
+  /// `juniors`), or `null`.
+  final String? tour;
+
+  /// Surface: `hard`, `clay`, `grass`, or `null`.
+  final String? surface;
+
+  /// Whether the tournament is indoors.
+  final bool? indoor;
+
+  /// Host city, from a curated table — `null` where not curated.
+  final String? city;
+
+  /// Host country, ISO-3166 alpha-2 — `null` where not curated.
+  final String? country;
+
+  /// Category (`grand_slam`, `masters_1000`, `tour_finals`, `atp_500`,
+  /// `atp_250`, `wta_1000`, `wta_500`, `wta_250`, `wta_125`, `challenger`,
+  /// `itf`, `juniors`), or `null` where the catalogues do not agree — never
+  /// guessed from the name.
+  final String? category;
+
+  /// The exact map this tournament was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a tournament.
+  const Tournament({
+    this.id,
+    this.name,
+    this.tour,
+    this.surface,
+    this.indoor,
+    this.city,
+    this.country,
+    this.category,
+    this.raw = const {},
+  });
+
+  /// Decodes a tournament object.
+  factory Tournament.fromJson(Map<String, dynamic> json) => Tournament(
+        id: _asString(json['id']),
+        name: _asString(json['name']),
+        tour: _asString(json['tour']),
+        surface: _asString(json['surface']),
+        indoor: _asBool(json['indoor']),
+        city: _asString(json['city']),
+        country: _asString(json['country']),
+        category: _asString(json['category']),
+        raw: json,
+      );
+}
+
+/// The per-window limits of a key's tier.
+class UsageLimits {
+  /// Requests allowed per minute, or `null` when unlimited/unknown.
+  final int? perMinute;
+
+  /// Requests allowed per day, or `null` when unlimited/unknown.
+  final int? perDay;
+
+  /// The exact map this object was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a limits object.
+  const UsageLimits({this.perMinute, this.perDay, this.raw = const {}});
+
+  /// Decodes a `limits` object.
+  factory UsageLimits.fromJson(Map<String, dynamic> json) => UsageLimits(
+        perMinute: _asInt(json['per_minute']),
+        perDay: _asInt(json['per_day']),
+        raw: json,
+      );
+}
+
+/// Today's usage for the calling key, current to the second.
+class UsageToday {
+  /// Calls made today.
+  final int? calls;
+
+  /// Errors returned today.
+  final int? errors;
+
+  /// Calls remaining in today's quota, or `null` when unlimited/unknown.
+  final int? remainingDay;
+
+  /// The exact map this object was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a today object.
+  const UsageToday({
+    this.calls,
+    this.errors,
+    this.remainingDay,
+    this.raw = const {},
+  });
+
+  /// Decodes a `today` object.
+  factory UsageToday.fromJson(Map<String, dynamic> json) => UsageToday(
+        calls: _asInt(json['calls']),
+        errors: _asInt(json['errors']),
+        remainingDay: _asInt(json['remaining_day']),
+        raw: json,
+      );
+}
+
+/// One day of a key's usage history.
+class UsageDay {
+  /// The day.
+  final DateTime? day;
+
+  /// Calls made that day.
+  final int? calls;
+
+  /// Errors returned that day.
+  final int? errors;
+
+  /// The exact map this object was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a history day.
+  const UsageDay({this.day, this.calls, this.errors, this.raw = const {}});
+
+  /// Decodes a history row.
+  factory UsageDay.fromJson(Map<String, dynamic> json) => UsageDay(
+        day: _asDateTime(json['day']),
+        calls: _asInt(json['calls']),
+        errors: _asInt(json['errors']),
+        raw: json,
+      );
+}
+
+/// The calling key's own usage vs quota. Any tier; the call itself is
+/// quota-exempt.
+///
+/// Durable daily usage: tier, limits, today's calls (current to the second)
+/// and a 30-day [history]. The per-minute window lives on the
+/// `X-RateLimit-*` headers of every response, not here — and this endpoint
+/// does **not** return the daily reset instant; that appears only as
+/// `resets_at` on a daily-429 body ([RateLimitedException] `resetsAt`).
+class Usage {
+  /// Opaque reference to your own key.
+  final String? principal;
+
+  /// The effective tier: `free`, `basic`, `pro`, or `ultra`.
+  final String? tier;
+
+  /// The subscription tier; equals [tier] unless a temporary grant is active.
+  final String? baseTier;
+
+  /// When a temporary tier grant reverts, else `null`.
+  final DateTime? tierExpiresAt;
+
+  /// The key's channel.
+  final String? channel;
+
+  /// The tier's per-window limits.
+  final UsageLimits? limits;
+
+  /// Today's usage, current to the second.
+  final UsageToday? today;
+
+  /// The last 30 days, oldest first.
+  final List<UsageDay> history;
+
+  /// When this summary was generated.
+  final DateTime? asOf;
+
+  /// The exact map this summary was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a usage summary.
+  const Usage({
+    this.principal,
+    this.tier,
+    this.baseTier,
+    this.tierExpiresAt,
+    this.channel,
+    this.limits,
+    this.today,
+    this.history = const [],
+    this.asOf,
+    this.raw = const {},
+  });
+
+  /// Decodes a usage body.
+  factory Usage.fromJson(Map<String, dynamic> json) {
+    final limits = _asMap(json['limits']);
+    final today = _asMap(json['today']);
+    final rawHistory = json['history'];
+    return Usage(
+      principal: _asString(json['principal']),
+      tier: _asString(json['tier']),
+      baseTier: _asString(json['base_tier']),
+      tierExpiresAt: _asDateTime(json['tier_expires_at']),
+      channel: _asString(json['channel']),
+      limits: limits == null ? null : UsageLimits.fromJson(limits),
+      today: today == null ? null : UsageToday.fromJson(today),
+      history: <UsageDay>[
+        if (rawHistory is List)
+          for (final d in rawHistory)
+            if (_asMap(d) case final m?) UsageDay.fromJson(m),
+      ],
+      asOf: _asDateTime(json['as_of']),
+      raw: json,
+    );
+  }
+}
+
+/// An outbound webhook registration. ULTRA, direct keys only.
+///
+/// The API POSTs the same frames the WebSocket sends to your HTTPS endpoint
+/// on every live score commit. [secret] is present **only** on the creation
+/// response — it is shown exactly once, so store it immediately; listings
+/// never include it.
+class Webhook {
+  /// The webhook id.
+  final int? id;
+
+  /// The destination URL (HTTPS, publicly routable).
+  final String? url;
+
+  /// The subscribed events: `score` and/or `break_point`.
+  final List<String>? events;
+
+  /// Whether deliveries are enabled.
+  final bool? enabled;
+
+  /// When the webhook was registered.
+  final DateTime? createdAt;
+
+  /// When the last delivery was made, or `null`.
+  final DateTime? lastDeliveryAt;
+
+  /// Consecutive failed deliveries.
+  final int? consecutiveFailures;
+
+  /// The last delivery error, or `null`.
+  final String? lastError;
+
+  /// The signing secret — present **only** on the creation response, shown
+  /// exactly once. `null` everywhere else.
+  final String? secret;
+
+  /// A note accompanying [secret] on creation, or `null`.
+  final String? secretNote;
+
+  /// The exact map this webhook was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a webhook.
+  const Webhook({
+    this.id,
+    this.url,
+    this.events,
+    this.enabled,
+    this.createdAt,
+    this.lastDeliveryAt,
+    this.consecutiveFailures,
+    this.lastError,
+    this.secret,
+    this.secretNote,
+    this.raw = const {},
+  });
+
+  /// Decodes a webhook object.
+  factory Webhook.fromJson(Map<String, dynamic> json) => Webhook(
+        id: _asInt(json['id']),
+        url: _asString(json['url']),
+        events: _asStringList(json['events']),
+        enabled: _asBool(json['enabled']),
+        createdAt: _asDateTime(json['created_at']),
+        lastDeliveryAt: _asDateTime(json['last_delivery_at']),
+        consecutiveFailures: _asInt(json['consecutive_failures']),
+        lastError: _asString(json['last_error']),
+        secret: _asString(json['secret']),
+        secretNote: _asString(json['secret_note']),
+        raw: json,
+      );
+}
+
 /// Every charting stat family for one charted match, both players, with the
 /// per-set split exactly as charted. ULTRA only.
 class ChartingMatch {
