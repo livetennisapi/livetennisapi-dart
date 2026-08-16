@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.2.1 — 2026-08-16
+
+### Added
+
+- `PackageKind.rally` — the charted rally corpus (shot-by-shot) as yearly
+  exports (ULTRA), and `PackageKind.archive` — the results archive
+  (1968–2022) as yearly exports, same entitlement as the tape packages.
+  Both are yearly kinds: their `period` is the bare year `YYYY`. Additive —
+  the wire default (`tape`) and existing behaviour are unchanged.
+
+### Fixed
+
+- README install instruction now points at `^1.0.0` — the latest version
+  published on pub.dev — instead of `^1.2.0`, which is not yet on pub.dev
+  and made `pub get` fail. Newer versions are tagged on GitHub and pending
+  pub.dev publication; a git-dependency snippet documents the interim path.
+
 ## 1.2.0 — 2026-08-07
 
 Full API parity: every documented public v1 REST path now has a typed method.

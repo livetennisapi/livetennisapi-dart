@@ -23,7 +23,19 @@ ITF and juniors, over REST.
 
 ```yaml
 dependencies:
-  livetennisapi: ^1.2.0
+  livetennisapi: ^1.0.0
+```
+
+The latest version published on pub.dev is 1.0.0; newer versions (1.2.x) are
+tagged on GitHub and pending publication to pub.dev. To use the newest release
+in the meantime, depend on the git tag directly:
+
+```yaml
+dependencies:
+  livetennisapi:
+    git:
+      url: https://github.com/livetennisapi/livetennisapi-dart.git
+      ref: v1.2.1
 ```
 
 ## Usage
@@ -98,7 +110,7 @@ Full parity with the documented public v1 REST surface:
 | `listArchiveMatches`, `getArchiveMatch` | `/history/archive/matches` | BASIC, or any History plan |
 | `listArchivePlayers` | `/history/archive/players` | BASIC, or any History plan |
 | `getArchiveCareer` | `/history/archive/career` | BASIC, or any History plan |
-| `listHistoryPackages`, `getHistoryPackage` | `/history/packages` | PRO+ (`kind: rankings` / `year` ULTRA) |
+| `listHistoryPackages`, `getHistoryPackage` | `/history/packages` | PRO+ (`kind: rankings`/`rally` and `year` ULTRA; `kind: archive` same as tape) |
 | `listRallyMatches`, `getRallyMatch` | `/rally/matches` | ULTRA |
 | `getMatchRally` | `/history/matches/{id}/rally` | ULTRA |
 | `getChartingPlayer` | `/charting/players` | ULTRA |

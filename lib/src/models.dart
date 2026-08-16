@@ -1690,7 +1690,8 @@ class PackageFile {
 /// object per line, coverage meta included); the CSV is flattened to one row
 /// per point and carries no coverage columns.
 class HistoryPackage {
-  /// The month, `YYYY-MM`.
+  /// The month, `YYYY-MM` — or the bare year `YYYY` on the yearly kinds
+  /// (`rally`, `archive`).
   final String? period;
 
   /// Always `ready` — only built months are listed or served.
@@ -1708,9 +1709,9 @@ class HistoryPackage {
   /// When the package was built.
   final DateTime? builtAt;
 
-  /// The package family. Present only on non-tape packages (`rankings`);
-  /// absent — decoded as `null` — on tape packages, so a tape-only consumer
-  /// never sees the shape change.
+  /// The package family. Present only on non-tape packages (`rankings`,
+  /// `rally`, `archive`); absent — decoded as `null` — on tape packages, so
+  /// a tape-only consumer never sees the shape change.
   final String? kind;
 
   /// The exact map this package was decoded from.

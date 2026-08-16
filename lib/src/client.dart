@@ -11,7 +11,7 @@ import 'errors.dart';
 import 'models.dart';
 
 /// The package version, sent in the `User-Agent` header.
-const String packageVersion = '1.2.0';
+const String packageVersion = '1.2.1';
 
 /// The default API base URL.
 const String defaultBaseUrl = 'https://api.livetennisapi.com/api/public/v1';
@@ -157,7 +157,15 @@ enum PackageKind {
   tape,
 
   /// As-of ranking records (ULTRA).
-  rankings;
+  rankings,
+
+  /// The charted rally corpus (shot-by-shot) as yearly exports (ULTRA).
+  /// A yearly kind: its `period` is the bare year `YYYY`.
+  rally,
+
+  /// The results archive (1968–2022) as yearly exports, same entitlement as
+  /// the tape packages. A yearly kind: its `period` is the bare year `YYYY`.
+  archive;
 
   /// The wire value sent as the `kind` query parameter.
   String get wire => name;
@@ -765,8 +773,11 @@ class LiveTennisApi {
   /// Pre-built monthly bulk packages, newest period first. **PRO**, or a
   /// package/History subscription.
   ///
-  /// [kind] selects the family: tapes (default) or as-of ranking records
-  /// (`rankings` needs ULTRA). [year] (`YYYY`) lists every published month of
+  /// [kind] selects the family: monthly tapes (default), as-of ranking
+  /// records (`rankings`, ULTRA), the yearly charted rally corpus (`rally`,
+  /// ULTRA) or the yearly results archive 1968–2022 (`archive`, same
+  /// entitlement as the tape packages). The yearly kinds' `period` is `YYYY`,
+  /// one file per year. [year] (`YYYY`) lists every published month of
   /// that year — the year-archive listing, which needs ULTRA, History
   /// Business, or a 1-year package. Coverage is not a contiguous run of
   /// months; treat this listing as the authoritative set.
@@ -780,17 +791,21 @@ class LiveTennisApi {
         'kind': kind == PackageKind.tape ? null : kind.wire,
         'year': year,
       },
-      kind == PackageKind.rankings || year != null ? 'ULTRA' : null,
+      kind == PackageKind.rankings || kind == PackageKind.rally || year != null
+          ? 'ULTRA'
+          : null,
     );
     return Page.fromJson(body, HistoryPackage.fromJson);
   }
 
-  /// One monthly package's manifest — file names, sizes and SHA-256
-  /// checksums. **PRO**, or a package/History subscription; `rankings` needs
-  /// ULTRA.
+  /// One package's manifest — file names, sizes and SHA-256
+  /// checksums. **PRO**, or a package/History subscription; `rankings` and
+  /// `rally` need ULTRA; `archive` rides the tape entitlement.
   ///
-  /// [period] is `YYYY-MM`. To download the file itself, request the same
-  /// path with `?format=jsonl|csv` over plain HTTP and stream the attachment
+  /// [period] is `YYYY-MM` — except for the yearly kinds ([PackageKind.rally]
+  /// and [PackageKind.archive]), where it is the bare year `YYYY`. To
+  /// download the file itself, request the same path with
+  /// `?format=jsonl|csv` over plain HTTP and stream the attachment
   /// — this client returns the JSON manifest only.
   Future<HistoryPackage?> getHistoryPackage(
     String period, {
@@ -799,7 +814,9 @@ class LiveTennisApi {
     final body = await _request(
       '/history/packages/$period',
       {'kind': kind == PackageKind.tape ? null : kind.wire},
-      kind == PackageKind.rankings ? 'ULTRA' : null,
+      kind == PackageKind.rankings || kind == PackageKind.rally
+          ? 'ULTRA'
+          : null,
     );
     return body is Map
         ? HistoryPackage.fromJson(Map<String, dynamic>.from(body))

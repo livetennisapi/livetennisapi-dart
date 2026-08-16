@@ -323,6 +323,21 @@ void main() {
       client.close();
     });
 
+    test('yearly package kinds send their wire kind and a bare-year period',
+        () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(packagesPage);
+      });
+      await client.listHistoryPackages(kind: PackageKind.rally);
+      expect(seen.url.queryParameters['kind'], 'rally');
+      await client.getHistoryPackage('1999', kind: PackageKind.archive);
+      expect(seen.url.path, '/api/public/v1/history/packages/1999');
+      expect(seen.url.queryParameters['kind'], 'archive');
+      client.close();
+    });
+
     test('archive, rally and charting requests hit their paths', () async {
       final paths = <String>[];
       final client = clientWith((req) async {
@@ -520,6 +535,28 @@ void main() {
         await tierFor(
             (c) => c.listHistoryPackages(kind: PackageKind.rankings)),
         'ULTRA',
+      );
+    });
+
+    test('rally packages are ULTRA; archive packages ride the tape (PRO)',
+        () async {
+      expect(
+        await tierFor((c) => c.listHistoryPackages(kind: PackageKind.rally)),
+        'ULTRA',
+      );
+      expect(
+        await tierFor((c) => c.getHistoryPackage('2024', kind: PackageKind.rally)),
+        'ULTRA',
+      );
+      // archive has the SAME entitlement as tape — never attributed to ULTRA.
+      expect(
+        await tierFor((c) => c.listHistoryPackages(kind: PackageKind.archive)),
+        'PRO',
+      );
+      expect(
+        await tierFor(
+            (c) => c.getHistoryPackage('1999', kind: PackageKind.archive)),
+        'PRO',
       );
     });
 
