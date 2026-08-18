@@ -1,0 +1,29 @@
+name: publish
+
+# Publishes the `livetennisapi` package to pub.dev on a version tag.
+#
+# Uses pub.dev Automated Publishing (GitHub Actions OIDC) — there is NO pub.dev
+# credential stored in this repository or its secrets. pub.dev verifies this
+# workflow's identity directly via the official dart-lang reusable workflow.
+# This matches how livetennisapi-python (PyPI) and livetennisapi-js (npm)
+# already publish.
+#
+# One-time setup on pub.dev (package page -> Admin tab -> Automated publishing):
+#   Enable "Publishing from GitHub Actions":
+#     Repository:        livetennisapi/livetennisapi-dart
+#     Tag pattern:       v{{version}}
+#   (Optional) require the tag to come from a GitHub environment named `pub.dev`.
+#
+# The tag must match the pubspec version, e.g. tag `v1.2.1` -> pubspec 1.2.1.
+# The reusable workflow enforces that before it will publish.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+jobs:
+  publish:
+    permissions:
+      id-token: write   # required for pub.dev OIDC authentication
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
