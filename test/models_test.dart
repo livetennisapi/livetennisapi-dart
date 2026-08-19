@@ -197,11 +197,19 @@ void main() {
       expect(m.withdrew, 2);
     });
 
+    test('eventStatusUpdatedAt decodes as a UTC instant', () {
+      // The instant the current event_status was recorded (added 2026-08-19).
+      final m = Match.fromJson(_json(completedRetiredMatch));
+      expect(m.eventStatusUpdatedAt, DateTime.utc(2026, 8, 19, 9, 15));
+    });
+
     test('the new fields are null on an older payload', () {
       final m = Match.fromJson(_json(liveSinglesMatch));
       expect(m.tour, isNull);
       expect(m.tournamentId, isNull);
       expect(m.roundCode, isNull);
+      // Never backfilled: absent (or null) stays null.
+      expect(m.eventStatusUpdatedAt, isNull);
       expect(m.withdrew, isNull);
     });
   });

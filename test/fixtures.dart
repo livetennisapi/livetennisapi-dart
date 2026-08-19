@@ -124,7 +124,8 @@ const String abuseThrottledBody = '''
 ''';
 
 /// A completed match carrying the fields added since 1.0.0: `tour` (filter
-/// vocabulary), `tournament_id`, `round_code`, `event_status` and `withdrew`.
+/// vocabulary), `tournament_id`, `round_code`, `event_status`,
+/// `event_status_updated_at` and `withdrew`.
 const String completedRetiredMatch = '''
 {
   "id": 24101,
@@ -138,6 +139,7 @@ const String completedRetiredMatch = '''
   "round_code": "QF",
   "status": "completed",
   "event_status": "Retired",
+  "event_status_updated_at": "2026-08-19T09:15:00Z",
   "is_doubles": false,
   "scheduled_time": "2026-07-24T11:30:00Z",
   "players": {

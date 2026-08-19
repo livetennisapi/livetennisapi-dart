@@ -668,6 +668,13 @@ class Match {
   /// resumes.
   final String? eventStatus;
 
+  /// The instant the current [eventStatus] was recorded, UTC (added
+  /// 2026-08-19). Bumps only when the value changes — a re-read of the same
+  /// status never moves it — and a clear back to `null` bumps it too. `null`
+  /// while the status has never changed since the field was introduced:
+  /// never backfilled, never guessed.
+  final DateTime? eventStatusUpdatedAt;
+
   /// Whether this is a doubles match.
   final bool? isDoubles;
 
@@ -714,6 +721,7 @@ class Match {
     this.roundCode,
     this.status,
     this.eventStatus,
+    this.eventStatusUpdatedAt,
     this.isDoubles,
     this.scheduledTime,
     this.p1,
@@ -746,6 +754,7 @@ class Match {
       roundCode: _asString(json['round_code']),
       status: _asString(json['status']),
       eventStatus: _asString(json['event_status']),
+      eventStatusUpdatedAt: _asDateTime(json['event_status_updated_at']),
       isDoubles: _asBool(json['is_doubles']),
       scheduledTime: _asDateTime(json['scheduled_time']),
       p1: p1 == null ? null : Player.fromJson(p1),
