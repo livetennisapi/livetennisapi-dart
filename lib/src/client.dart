@@ -11,7 +11,7 @@ import 'errors.dart';
 import 'models.dart';
 
 /// The package version, sent in the `User-Agent` header.
-const String packageVersion = '1.2.1';
+const String packageVersion = '1.3.0';
 
 /// The default API base URL.
 const String defaultBaseUrl = 'https://api.livetennisapi.com/api/public/v1';

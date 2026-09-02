@@ -125,7 +125,7 @@ const String abuseThrottledBody = '''
 
 /// A completed match carrying the fields added since 1.0.0: `tour` (filter
 /// vocabulary), `tournament_id`, `round_code`, `event_status`,
-/// `event_status_updated_at` and `withdrew`.
+/// `event_status_updated_at`, `withdrew`, `has_analysis` and `has_market`.
 const String completedRetiredMatch = '''
 {
   "id": 24101,
@@ -148,7 +148,9 @@ const String completedRetiredMatch = '''
   },
   "score": {"sets": [1, 0], "games": [[6, 3], [4, 1]]},
   "winner": 1,
-  "withdrew": 2
+  "withdrew": 2,
+  "has_analysis": true,
+  "has_market": false
 }
 ''';
 

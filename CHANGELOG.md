@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 1.3.0 — 2026-09-02
+
+### Added
+
+- `Match.hasAnalysis` and `Match.hasMarket` (`has_analysis`, `has_market`):
+  two booleans on every row of `listMatches` and on `getMatch`, every tier
+  (API 1.9.0, shipped to production 2026-09-02). They carry the same fact
+  `getMatchAnalysis` and `getMarketPrices` answer `404 no_analysis` /
+  `404 no_market` about, so a slate is filtered in one call instead of one
+  404 per match. Both are `bool?`: `null` when talking to an older server
+  that does not send them, never a guessed `false`.
+- `Match.eventStatusUpdatedAt` (`event_status_updated_at`): the instant the
+  current `eventStatus` was recorded, UTC (API 2026-08-19). `null` when the
+  status has never changed since the field was introduced — never backfilled.
+
 ## 1.2.1 — 2026-08-16
 
 ### Added

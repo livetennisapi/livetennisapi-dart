@@ -203,6 +203,21 @@ void main() {
       expect(m.eventStatusUpdatedAt, DateTime.utc(2026, 8, 19, 9, 15));
     });
 
+    test('hasAnalysis and hasMarket decode as given, true and false alike', () {
+      // The same fact getMatchAnalysis / getMarketPrices answer 404
+      // no_analysis / no_market about (added 2026-09-02). A present `false`
+      // must stay `false`, never collapse to null.
+      final m = Match.fromJson(_json(completedRetiredMatch));
+      expect(m.hasAnalysis, isTrue);
+      expect(m.hasMarket, isFalse);
+
+      final both = Match.fromJson(
+        _json('{"id": 1, "has_analysis": false, "has_market": true}'),
+      );
+      expect(both.hasAnalysis, isFalse);
+      expect(both.hasMarket, isTrue);
+    });
+
     test('the new fields are null on an older payload', () {
       final m = Match.fromJson(_json(liveSinglesMatch));
       expect(m.tour, isNull);
@@ -211,6 +226,9 @@ void main() {
       // Never backfilled: absent (or null) stays null.
       expect(m.eventStatusUpdatedAt, isNull);
       expect(m.withdrew, isNull);
+      // An older server sends neither flag: null, not a guessed false.
+      expect(m.hasAnalysis, isNull);
+      expect(m.hasMarket, isNull);
     });
   });
 

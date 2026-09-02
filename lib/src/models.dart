@@ -699,6 +699,18 @@ class Match {
   /// the sport. `null` otherwise.
   final int? withdrew;
 
+  /// Whether a model thesis or profile exists for this match (added
+  /// 2026-09-02). Present on every list row and on the detail, every tier.
+  /// Filter the slate on it before calling [LiveTennisApi.getMatchAnalysis],
+  /// which answers `404 no_analysis` about the same fact. `null` when talking
+  /// to an older server.
+  final bool? hasAnalysis;
+
+  /// Whether a match-winner market is mapped to this match (added
+  /// 2026-09-02). Same role for [LiveTennisApi.getMarketPrices], which
+  /// answers `404 no_market`. `null` when talking to an older server.
+  final bool? hasMarket;
+
   /// Embedded market. PRO tier and above; `null` below.
   final Market? market;
 
@@ -729,6 +741,8 @@ class Match {
     this.score,
     this.winner,
     this.withdrew,
+    this.hasAnalysis,
+    this.hasMarket,
     this.market,
     this.analysis,
     this.raw = const {},
@@ -762,6 +776,8 @@ class Match {
       score: score == null ? null : Score.fromJson(score),
       winner: _asInt(json['winner']),
       withdrew: _asInt(json['withdrew']),
+      hasAnalysis: _asBool(json['has_analysis']),
+      hasMarket: _asBool(json['has_market']),
       market: market == null ? null : Market.fromJson(market),
       analysis: analysis == null ? null : Analysis.fromJson(analysis),
       raw: json,
