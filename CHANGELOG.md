@@ -3,6 +3,19 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- `playerStats(playerId, {from, to, surface, level, last})` for
+  `GET /players/{id}/stats` (API 1.13.61). PRO returns `records`: W/L
+  overall and by surface, venue, level and season, the set-based record,
+  withdrawals and the last N matches. ULTRA adds `serveReturn`, the summed
+  serve and return statistics. It is `null` below ULTRA. Every percentage is
+  `double?`, `null` on an empty sample. A 403 names PRO as the required tier.
+- `Player.heightCm` (`height_cm`) and `Player.doublesRanking`
+  (`doubles_ranking`): set by `getPlayer` on paid tiers, `null` on a FREE key.
+
 ## 1.3.0 — 2026-09-02
 
 ### Added

@@ -80,6 +80,9 @@ enum Tour {
 const List<(String, String)> _tierRequirements = [
   ('/analysis', 'ULTRA'),
   ('/statistics', 'ULTRA'),
+  // /players/{id}/stats: records are PRO; serve_return is ULTRA but is simply
+  // absent below it, so a 403 here always means PRO.
+  ('/stats', 'PRO'),
   ('/rally', 'ULTRA'),
   ('/charting', 'ULTRA'),
   ('/ws-token', 'ULTRA'),
@@ -509,6 +512,40 @@ class LiveTennisApi {
     final body = await _request('/players/$playerId');
     return body is Map
         ? Player.fromJson(Map<String, dynamic>.from(body))
+        : null;
+  }
+
+  /// One player's record over our own completed singles matches, 2023
+  /// onward. **PRO**; ULTRA adds [PlayerStatsReport.serveReturn].
+  ///
+  /// [PlayerStatsReport.records] carries W/L overall and by surface, venue,
+  /// level and season, the set-based record, withdrawals and the last
+  /// [last] matches (1–50, default 20). Below ULTRA the API omits
+  /// `serve_return` and [PlayerStatsReport.serveReturn] is `null`.
+  ///
+  /// [from]/[to] are `YYYY-MM-DD` or ISO-8601 UTC instants by scheduled start
+  /// (default the 365 days ending now). [surface] is `hard`, `clay`, `grass`
+  /// or `indoor` (venue stated indoor, any surface). [level] is the match
+  /// tour vocabulary: `atp`, `wta`, `challenger`, `itf` or `juniors`. A
+  /// doubles-team id is a 400 `doubles_not_supported`. For 1968–2022 use
+  /// [getArchiveCareer].
+  Future<PlayerStatsReport?> playerStats(
+    int playerId, {
+    String? from,
+    String? to,
+    String? surface,
+    String? level,
+    int? last,
+  }) async {
+    final body = await _request('/players/$playerId/stats', {
+      'from': from,
+      'to': to,
+      'surface': surface,
+      'level': level,
+      'last': last,
+    });
+    return body is Map
+        ? PlayerStatsReport.fromJson(Map<String, dynamic>.from(body))
         : null;
   }
 

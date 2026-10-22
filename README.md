@@ -99,6 +99,7 @@ Full parity with the documented public v1 REST surface:
 | `getMatchAnalysis` | `/matches/{id}/analysis` | ULTRA |
 | `getMatchStatistics` | `/matches/{id}/statistics` | ULTRA |
 | `searchPlayers`, `getPlayer` | `/players`, `/players/{id}` | FREE |
+| `playerStats` | `/players/{id}/stats` | PRO (`serveReturn` ULTRA) |
 | `listFixtures` | `/fixtures` | FREE |
 | `listTournaments`, `getTournament` | `/tournaments`, `/tournaments/{id}` | FREE |
 | `listMarkets`, `getMarketPrices` | `/markets`, `/markets/{id}/prices` | PRO |

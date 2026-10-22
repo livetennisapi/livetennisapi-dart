@@ -332,6 +332,17 @@ class Player {
   /// Date of birth, or `null`.
   final DateTime? birthday;
 
+  /// Height in centimetres from the results archive's record of the same
+  /// person. Single-player endpoint only, paid tiers; `null` on a FREE key
+  /// and when no height is held. Never inferred.
+  final int? heightCm;
+
+  /// The current official ATP/WTA doubles position. Single-player endpoint
+  /// only, paid tiers; `null` on a FREE key, when the player is off the table
+  /// or was last seen there more than 21 days ago. [ranking] stays the
+  /// singles position.
+  final DoublesRanking? doublesRanking;
+
   /// Whether this record is a doubles team rather than an individual.
   final bool? isDoublesTeam;
 
@@ -357,6 +368,8 @@ class Player {
     this.hand,
     this.backhand,
     this.birthday,
+    this.heightCm,
+    this.doublesRanking,
     this.isDoublesTeam,
     this.dataCompleteness,
     this.stats,
@@ -366,6 +379,7 @@ class Player {
   /// Decodes a player object.
   factory Player.fromJson(Map<String, dynamic> json) {
     final completeness = _asMap(json['data_completeness']);
+    final doubles = _asMap(json['doubles_ranking']);
     return Player(
       id: _asInt(json['id']),
       name: _asString(json['name']),
@@ -377,6 +391,8 @@ class Player {
       hand: _asString(json['hand']),
       backhand: _asInt(json['backhand']),
       birthday: _asDateTime(json['birthday']),
+      heightCm: _asInt(json['height_cm']),
+      doublesRanking: doubles == null ? null : DoublesRanking.fromJson(doubles),
       isDoublesTeam: _asBool(json['is_doubles_team']),
       dataCompleteness:
           completeness == null ? null : DataCompleteness.fromJson(completeness),
@@ -384,6 +400,29 @@ class Player {
       raw: json,
     );
   }
+}
+
+/// A player's current position on the official ATP/WTA doubles table
+/// ([Player.doublesRanking]).
+class DoublesRanking {
+  /// The doubles rank.
+  final int? rank;
+
+  /// Doubles ranking points, or `null` when the table states none.
+  final int? points;
+
+  /// The UTC date our weekly refresh last found the player on the table.
+  final DateTime? observedOn;
+
+  /// Creates a doubles ranking.
+  const DoublesRanking({this.rank, this.points, this.observedOn});
+
+  /// Decodes a `doubles_ranking` object.
+  factory DoublesRanking.fromJson(Map<String, dynamic> json) => DoublesRanking(
+        rank: _asInt(json['rank']),
+        points: _asInt(json['points']),
+        observedOn: _asDateTime(json['observed_on']),
+      );
 }
 
 /// One price tick. [side] is `1` for player 1's outcome, `2` for player 2's.
@@ -2818,4 +2857,302 @@ class ChartingMatch {
         families: _asMap(json['families']),
         raw: json,
       );
+}
+
+/// A W/L split with its sample size ([PlayerRecords]).
+class PlayerWinLoss {
+  /// Matches counted.
+  final int? matches;
+
+  /// Matches won.
+  final int? wins;
+
+  /// Matches lost.
+  final int? losses;
+
+  /// Percent with one decimal; `null` (never 0) when [matches] is 0.
+  final double? winPct;
+
+  /// Creates a W/L split.
+  const PlayerWinLoss({this.matches, this.wins, this.losses, this.winPct});
+
+  /// Decodes a W/L object.
+  factory PlayerWinLoss.fromJson(Map<String, dynamic> json) => PlayerWinLoss(
+        matches: _asInt(json['matches']),
+        wins: _asInt(json['wins']),
+        losses: _asInt(json['losses']),
+        winPct: _asDouble(json['win_pct']),
+      );
+}
+
+Map<String, PlayerWinLoss> _asWinLossMap(Object? v) => <String, PlayerWinLoss>{
+      if (v is Map)
+        for (final e in v.entries)
+          if (_asMap(e.value) case final m?)
+            '${e.key}': PlayerWinLoss.fromJson(m),
+    };
+
+/// One row of [PlayerRecords.recent], from this player's side.
+class PlayerRecentMatch {
+  /// The match id; pass it to `getMatch`.
+  final int? matchId;
+
+  /// The match date, or `null`.
+  final DateTime? date;
+
+  /// The scheduled start, UTC, or `null`.
+  final DateTime? scheduledTime;
+
+  /// The tournament id, or `null`.
+  final String? tournamentId;
+
+  /// The tournament name, or `null`.
+  final String? tournament;
+
+  /// The round label, or `null`.
+  final String? round;
+
+  /// The normalised round code, or `null`.
+  final String? roundCode;
+
+  /// The court surface, or `null`.
+  final String? surface;
+
+  /// Whether the venue is indoor; `null` when not stated.
+  final bool? indoor;
+
+  /// The match tour, or `null`.
+  final String? level;
+
+  /// The opponent's player id.
+  final int? opponentId;
+
+  /// The opponent's name, or `null`.
+  final String? opponentName;
+
+  /// Whether this player won.
+  final bool? won;
+
+  /// `completed`, `retired`, `walkover` or `default`.
+  final String? outcome;
+
+  /// Sets `[player, opponent]`; `null` when no score row is held.
+  final List<int?>? scoreSets;
+
+  /// Games `[[player per set], [opponent per set]]`; `null` when no score row
+  /// is held.
+  final List<List<int>>? scoreGames;
+
+  /// The exact map this row was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a recent-match row.
+  const PlayerRecentMatch({
+    this.matchId,
+    this.date,
+    this.scheduledTime,
+    this.tournamentId,
+    this.tournament,
+    this.round,
+    this.roundCode,
+    this.surface,
+    this.indoor,
+    this.level,
+    this.opponentId,
+    this.opponentName,
+    this.won,
+    this.outcome,
+    this.scoreSets,
+    this.scoreGames,
+    this.raw = const {},
+  });
+
+  /// Decodes a recent-match row.
+  factory PlayerRecentMatch.fromJson(Map<String, dynamic> json) {
+    final opponent = _asMap(json['opponent']);
+    final score = _asMap(json['score']);
+    return PlayerRecentMatch(
+      matchId: _asInt(json['match_id']),
+      date: _asDateTime(json['date']),
+      scheduledTime: _asDateTime(json['scheduled_time']),
+      tournamentId: _asString(json['tournament_id']),
+      tournament: _asString(json['tournament']),
+      round: _asString(json['round']),
+      roundCode: _asString(json['round_code']),
+      surface: _asString(json['surface']),
+      indoor: _asBool(json['indoor']),
+      level: _asString(json['level']),
+      opponentId: opponent == null ? null : _asInt(opponent['id']),
+      opponentName: opponent == null ? null : _asString(opponent['name']),
+      won: _asBool(json['won']),
+      outcome: _asString(json['outcome']),
+      scoreSets: score == null ? null : _asNullableIntList(score['sets']),
+      scoreGames: score == null ? null : _asGames(score['games']),
+      raw: json,
+    );
+  }
+}
+
+/// The results-based record of [PlayerStatsReport] (PRO).
+///
+/// W/L splits count matches with a published winner and an outcome of
+/// completed, retired, walkover or default. The set-based record, the
+/// withdrawals and the exclusion counts are kept as the API's maps.
+class PlayerRecords {
+  /// Every counted match in the window.
+  final PlayerWinLoss? overall;
+
+  /// The last 12 months.
+  final PlayerWinLoss? last12Months;
+
+  /// Keyed `hard`, `clay`, `grass`, `unknown`.
+  final Map<String, PlayerWinLoss> bySurface;
+
+  /// Keyed `indoor`, `outdoor`, `unknown`.
+  final Map<String, PlayerWinLoss> byVenue;
+
+  /// Keyed by match tour (`atp`, `wta`, `challenger`, `itf`, `juniors`) or
+  /// `unknown`.
+  final Map<String, PlayerWinLoss> byLevel;
+
+  /// Keyed by the UTC calendar year of the scheduled start.
+  final Map<String, PlayerWinLoss> bySeason;
+
+  /// The set-based record: `sample`, `tiebreaks`, `deciding_sets`,
+  /// `after_winning_first_set`, `after_losing_first_set`, `comebacks`,
+  /// `sets`. Each block carries its own sample size.
+  final Map<String, dynamic>? sets;
+
+  /// Per outcome (`retired`, `walkover`, `default`): `given` and `received`.
+  final Map<String, dynamic>? withdrawals;
+
+  /// Matches left out of every record, by reason.
+  final Map<String, dynamic>? excluded;
+
+  /// The last N matches, newest first.
+  final List<PlayerRecentMatch> recent;
+
+  /// The exact map this record was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a record.
+  const PlayerRecords({
+    this.overall,
+    this.last12Months,
+    this.bySurface = const {},
+    this.byVenue = const {},
+    this.byLevel = const {},
+    this.bySeason = const {},
+    this.sets,
+    this.withdrawals,
+    this.excluded,
+    this.recent = const [],
+    this.raw = const {},
+  });
+
+  /// Decodes a `records` object.
+  factory PlayerRecords.fromJson(Map<String, dynamic> json) {
+    final overall = _asMap(json['overall']);
+    final last12 = _asMap(json['last_12_months']);
+    final rawRecent = json['recent'];
+    return PlayerRecords(
+      overall: overall == null ? null : PlayerWinLoss.fromJson(overall),
+      last12Months: last12 == null ? null : PlayerWinLoss.fromJson(last12),
+      bySurface: _asWinLossMap(json['by_surface']),
+      byVenue: _asWinLossMap(json['by_venue']),
+      byLevel: _asWinLossMap(json['by_level']),
+      bySeason: _asWinLossMap(json['by_season']),
+      sets: _asMap(json['sets']),
+      withdrawals: _asMap(json['withdrawals']),
+      excluded: _asMap(json['excluded']),
+      recent: <PlayerRecentMatch>[
+        if (rawRecent is List)
+          for (final r in rawRecent)
+            if (_asMap(r) case final m?) PlayerRecentMatch.fromJson(m),
+      ],
+      raw: json,
+    );
+  }
+}
+
+/// The response of `playerStats`: one player's record over our own completed
+/// singles matches.
+class PlayerStatsReport {
+  /// The player id.
+  final int? playerId;
+
+  /// The player name.
+  final String? playerName;
+
+  /// The window start applied, UTC.
+  final DateTime? windowFrom;
+
+  /// The window end applied, UTC.
+  final DateTime? windowTo;
+
+  /// The surface filter applied, or `null`.
+  final String? surface;
+
+  /// The level filter applied, or `null`.
+  final String? level;
+
+  /// How many recent matches were asked for.
+  final int? last;
+
+  /// The results-based record (PRO).
+  final PlayerRecords? records;
+
+  /// The summed serve and return statistics (ULTRA): `matches`,
+  /// `matches_with_stats`, `serve` and `return`. Each ratio is
+  /// `numerator` / `denominator` / `pct` with the `matches` it was summed
+  /// over. `null` below ULTRA, where the API omits the key.
+  final Map<String, dynamic>? serveReturn;
+
+  /// When the response was computed (cached up to 60 seconds).
+  final DateTime? generatedAt;
+
+  /// What the aggregates are computed from.
+  final String? note;
+
+  /// The exact map this report was decoded from.
+  final Map<String, dynamic> raw;
+
+  /// Creates a report.
+  const PlayerStatsReport({
+    this.playerId,
+    this.playerName,
+    this.windowFrom,
+    this.windowTo,
+    this.surface,
+    this.level,
+    this.last,
+    this.records,
+    this.serveReturn,
+    this.generatedAt,
+    this.note,
+    this.raw = const {},
+  });
+
+  /// Decodes a `/players/{id}/stats` body.
+  factory PlayerStatsReport.fromJson(Map<String, dynamic> json) {
+    final player = _asMap(json['player']);
+    final window = _asMap(json['window']);
+    final filters = _asMap(json['filters']);
+    final records = _asMap(json['records']);
+    final meta = _asMap(json['meta']);
+    return PlayerStatsReport(
+      playerId: player == null ? null : _asInt(player['id']),
+      playerName: player == null ? null : _asString(player['name']),
+      windowFrom: window == null ? null : _asDateTime(window['from']),
+      windowTo: window == null ? null : _asDateTime(window['to']),
+      surface: filters == null ? null : _asString(filters['surface']),
+      level: filters == null ? null : _asString(filters['level']),
+      last: filters == null ? null : _asInt(filters['last']),
+      records: records == null ? null : PlayerRecords.fromJson(records),
+      serveReturn: _asMap(json['serve_return']),
+      generatedAt: meta == null ? null : _asDateTime(meta['generated_at']),
+      note: meta == null ? null : _asString(meta['note']),
+      raw: json,
+    );
+  }
 }

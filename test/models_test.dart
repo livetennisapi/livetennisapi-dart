@@ -458,4 +458,62 @@ void main() {
       expect(pkg.files[0].sha256, 'abc123');
     });
   });
+
+  group('player stats', () {
+    test('decodes records, recent rows and nullable percentages', () {
+      final r = PlayerStatsReport.fromJson(_json(playerStatsBody));
+      expect(r.playerName, 'Vlado Jankanj');
+      expect(r.surface, 'clay');
+      expect(r.level, isNull);
+      expect(r.windowFrom, DateTime.utc(2025, 1, 1));
+      final rec = r.records!;
+      expect(rec.overall?.matches, 30);
+      expect(rec.overall?.winPct, 60.0);
+      expect(rec.bySeason['2025']?.wins, 18);
+      expect(rec.byVenue['unknown']?.winPct, 50.0);
+      expect(rec.sets?['deciding_sets']['win_pct'], isNull);
+      expect(rec.withdrawals?['walkover']['received'], 1);
+      expect(rec.recent, hasLength(2));
+      final first = rec.recent.first;
+      expect(first.won, isTrue);
+      expect(first.opponentId, 9001);
+      expect(first.scoreSets, [2, 1]);
+      expect(first.scoreGames, [
+        [6, 3, 7],
+        [4, 6, 5],
+      ]);
+      expect(first.indoor, isFalse);
+      final second = rec.recent[1];
+      expect(second.outcome, 'walkover');
+      expect(second.scoreSets, isNull);
+      expect(second.indoor, isNull);
+      expect(second.opponentName, isNull);
+      expect(r.serveReturn?['return']['break_points_converted']['pct'], isNull);
+    });
+
+    test('serve_return is null below ULTRA', () {
+      final r = PlayerStatsReport.fromJson(_json(playerStatsProBody));
+      expect(r.serveReturn, isNull);
+      expect(r.records?.overall?.winPct, isNull);
+      expect(r.records?.recent, isEmpty);
+    });
+  });
+
+  group('player profile extras', () {
+    test('height_cm and doubles_ranking decode on a paid key', () {
+      final p = Player.fromJson(_json(
+          '{"id": 1, "height_cm": 185, "doubles_ranking": {"rank": 42, "points": null, "observed_on": "2026-10-19"}}'));
+      expect(p.heightCm, 185);
+      expect(p.doublesRanking?.rank, 42);
+      expect(p.doublesRanking?.points, isNull);
+      expect(p.doublesRanking?.observedOn, DateTime(2026, 10, 19));
+    });
+
+    test('both are null on a FREE key', () {
+      final p = Player.fromJson(
+          _json('{"id": 1, "height_cm": null, "doubles_ranking": null}'));
+      expect(p.heightCm, isNull);
+      expect(p.doublesRanking, isNull);
+    });
+  });
 }

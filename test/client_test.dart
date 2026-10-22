@@ -487,6 +487,49 @@ void main() {
     });
   });
 
+  group('playerStats', () {
+    test('sends the path and every filter, and decodes the report', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(playerStatsBody);
+      });
+      final report = await client.playerStats(
+        2317,
+        from: '2025-01-01',
+        to: '2025-12-31',
+        surface: 'clay',
+        level: 'itf',
+        last: 2,
+      );
+      expect(seen.url.path, '/api/public/v1/players/2317/stats');
+      expect(seen.url.queryParameters, {
+        'from': '2025-01-01',
+        'to': '2025-12-31',
+        'surface': 'clay',
+        'level': 'itf',
+        'last': '2',
+      });
+      expect(report?.playerId, 2317);
+      expect(report?.records?.overall?.wins, 18);
+      expect(report?.serveReturn?['matches_with_stats'], 20);
+      client.close();
+    });
+
+    test('omitted filters send no query', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(playerStatsProBody);
+      });
+      final report = await client.playerStats(1);
+      expect(seen.url.path, '/api/public/v1/players/1/stats');
+      expect(seen.url.queryParameters, isEmpty);
+      expect(report?.serveReturn, isNull);
+      client.close();
+    });
+  });
+
   group('tier attribution', () {
     Future<String?> tierFor(Future<void> Function(LiveTennisApi) call) async {
       final client = clientWith(
@@ -501,6 +544,10 @@ void main() {
         client.close();
       }
     }
+
+    test('player stats is PRO', () async {
+      expect(await tierFor((c) => c.playerStats(1)), 'PRO');
+    });
 
     test('rankings listing mode is PRO, per-player mode is ULTRA', () async {
       expect(
