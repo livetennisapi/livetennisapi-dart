@@ -13,6 +13,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   withdrawals and the last N matches. ULTRA adds `serveReturn`, the summed
   serve and return statistics. It is `null` below ULTRA. Every percentage is
   `double?`, `null` on an empty sample. A 403 names PRO as the required tier.
+  `PlayerRecentMatch.scoreGames` is `List<List<int?>>?`: a `null` set is kept
+  in position (its games are unknown) rather than dropped, so later sets do
+  not shift left. `serveReturn` carries `matches_incomplete`, the matches
+  whose measured statistics stop short of the final and are left out of
+  every sum.
 - `Player.heightCm` (`height_cm`) and `Player.doublesRanking`
   (`doubles_ranking`): set by `getPlayer` on paid tiers, `null` on a FREE key.
 

@@ -491,6 +491,22 @@ void main() {
       expect(r.serveReturn?['return']['break_points_converted']['pct'], isNull);
     });
 
+    test('keeps a null set in score.games and reads matches_incomplete', () {
+      final r = PlayerStatsReport.fromJson(_json(playerStatsNullGamesBody));
+      final first = r.records!.recent.single;
+      expect(first.scoreGames, [
+        [6, null, 7],
+        [4, 6, 5],
+      ]);
+      expect(first.scoreGames![0], hasLength(3));
+      expect(first.scoreGames![1], hasLength(3));
+      expect(first.scoreGames![0][1], isNull);
+      expect(first.scoreGames![0][2], 7);
+      expect(r.serveReturn?['matches'], 3);
+      expect(r.serveReturn?['matches_with_stats'], 2);
+      expect(r.serveReturn?['matches_incomplete'], 1);
+    });
+
     test('serve_return is null below ULTRA', () {
       final r = PlayerStatsReport.fromJson(_json(playerStatsProBody));
       expect(r.serveReturn, isNull);

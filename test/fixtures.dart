@@ -514,6 +514,31 @@ const String playerStatsBody = r'''
 ''';
 
 /// The same endpoint below ULTRA: serve_return is absent, not null.
+/// PlayerStats with a null set inside `score.games` (a retired match whose
+/// second set is unknown) and `serve_return.matches_incomplete` (values
+/// invented).
+const String playerStatsNullGamesBody = r'''
+{
+  "player": {"id": 2317, "name": "Vlado Jankanj"},
+  "records": {
+    "overall": {"matches": 1, "wins": 1, "losses": 0, "win_pct": 100.0},
+    "recent": [
+      {"match_id": 21700, "date": "2025-12-21", "surface": "clay", "level": "itf",
+       "opponent": {"id": 9001, "name": "Example Opponent"}, "won": true, "outcome": "retired",
+       "score": {"sets": [2, 1], "games": [[6, null, 7], [4, 6, 5]]}}
+    ]
+  },
+  "serve_return": {
+    "matches": 3,
+    "matches_with_stats": 2,
+    "matches_incomplete": 1,
+    "serve": {},
+    "return": {}
+  },
+  "meta": {"generated_at": "2026-01-10T12:00:00Z"}
+}
+''';
+
 const String playerStatsProBody = r'''
 {"player": {"id": 1, "name": "A"}, "records": {"overall": {"matches": 0, "wins": 0, "losses": 0, "win_pct": null}}}
 ''';

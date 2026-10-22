@@ -66,6 +66,17 @@ List<List<int>>? _asGames(Object? v) {
   ];
 }
 
+/// Like [_asGames], but keeps a `null` set in position: the API sends `null`
+/// for a set whose games are unknown, and dropping it would shift every later
+/// set one place left. Used where the API documents per-set nullable integers.
+List<List<int?>>? _asNullableGames(Object? v) {
+  if (v is! List) return null;
+  return [
+    for (final side in v)
+      if (_asNullableIntList(side) case final row?) row else <int?>[],
+  ];
+}
+
 Map<String, dynamic>? _asMap(Object? v) =>
     v is Map ? Map<String, dynamic>.from(v) : null;
 
@@ -2941,8 +2952,9 @@ class PlayerRecentMatch {
   final List<int?>? scoreSets;
 
   /// Games `[[player per set], [opponent per set]]`; `null` when no score row
-  /// is held.
-  final List<List<int>>? scoreGames;
+  /// is held. Every set position is kept: an inner `null` is a set whose games
+  /// are unknown, not 0.
+  final List<List<int?>>? scoreGames;
 
   /// The exact map this row was decoded from.
   final Map<String, dynamic> raw;
@@ -2988,7 +3000,7 @@ class PlayerRecentMatch {
       won: _asBool(json['won']),
       outcome: _asString(json['outcome']),
       scoreSets: score == null ? null : _asNullableIntList(score['sets']),
-      scoreGames: score == null ? null : _asGames(score['games']),
+      scoreGames: score == null ? null : _asNullableGames(score['games']),
       raw: json,
     );
   }
@@ -3104,9 +3116,11 @@ class PlayerStatsReport {
   final PlayerRecords? records;
 
   /// The summed serve and return statistics (ULTRA): `matches`,
-  /// `matches_with_stats`, `serve` and `return`. Each ratio is
-  /// `numerator` / `denominator` / `pct` with the `matches` it was summed
-  /// over. `null` below ULTRA, where the API omits the key.
+  /// `matches_with_stats`, `matches_incomplete` (matches whose measured
+  /// statistics stop short of the final; left out of every sum), `serve` and
+  /// `return`. Each ratio is `numerator` / `denominator` / `pct` with the
+  /// `matches` it was summed over. `null` below ULTRA, where the API omits
+  /// the key.
   final Map<String, dynamic>? serveReturn;
 
   /// When the response was computed (cached up to 60 seconds).
