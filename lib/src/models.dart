@@ -2924,7 +2924,8 @@ class PlayerRecentMatch {
   /// The match tour, or `null`.
   final String? level;
 
-  /// The opponent's player id.
+  /// The opponent's player id, or `null` when the API sends `opponent: null`
+  /// because the match row holds no opponent id.
   final int? opponentId;
 
   /// The opponent's name, or `null`.
