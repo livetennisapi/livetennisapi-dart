@@ -232,7 +232,20 @@ const String wsTokenBody = '''
   "token": "eyJhbGciOi_example",
   "expires_in": 300,
   "ws_url": "wss://api.livetennisapi.com/connection/websocket",
-  "channels": {"match": "match:{id}", "slate": "slate:all"}
+  "channels": {"match": "match:{match_id}", "slate": "slate:all"},
+  "model_fields": "on"
+}
+''';
+
+/// The mint minted with `?model_fields=off`: the vocabulary names the
+/// score-only pair and echoes the switch.
+const String wsTokenScoreOnlyBody = '''
+{
+  "token": "eyJhbGciOi_example",
+  "expires_in": 300,
+  "ws_url": "wss://api.livetennisapi.com/connection/websocket",
+  "channels": {"match": "match:{match_id}:score_only", "slate": "slate:score_only"},
+  "model_fields": "off"
 }
 ''';
 

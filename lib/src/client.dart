@@ -798,10 +798,23 @@ class LiveTennisApi {
   /// The response carries the [WsToken.wsUrl] to connect to and the channel
   /// vocabulary: per-match channels ([WsToken.matchChannel]) and the
   /// `slate:all` channel with every live score frame. Frames are the same
-  /// allowlist score objects the polling endpoints return. Mint a fresh token
-  /// on reconnect.
-  Future<WsToken?> getWsToken() async {
-    final body = await _request('/ws-token');
+  /// allowlist score objects the polling endpoints return, nested under
+  /// `score`. Mint a fresh token on reconnect.
+  ///
+  /// Since 2026-10-23 every state leaves the score channels twice, and every
+  /// `score` frame carries `model` beside `score`: `pending` the instant the
+  /// state is accepted (the four model keys present and null) and `ready`
+  /// once its model run finished, both with the same `score.sequence`. Dedup
+  /// on `(match_id, score.sequence, model)`; a frame with no `model` is
+  /// `ready`. Pass `modelFields: false` if you do not use the model fields:
+  /// the token is minted with `?model_fields=off`, [WsToken.channels] then
+  /// names the score-only pair (`match:{match_id}:score_only` /
+  /// `slate:score_only`) with one `model: off` frame per state and the model
+  /// keys left out, and [WsToken.modelFields] echoes `off`.
+  Future<WsToken?> getWsToken({bool modelFields = true}) async {
+    final body = await _request('/ws-token', {
+      'model_fields': modelFields ? null : 'off',
+    });
     return body is Map
         ? WsToken.fromJson(Map<String, dynamic>.from(body))
         : null;

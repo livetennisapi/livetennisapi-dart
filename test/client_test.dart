@@ -302,11 +302,42 @@ void main() {
     });
 
     test('getWsToken decodes the channel vocabulary', () async {
-      final client = clientWith((req) async => _ok(wsTokenBody));
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(wsTokenBody);
+      });
       final token = await client.getWsToken();
+      expect(seen.url.queryParameters.containsKey('model_fields'), isFalse);
       expect(token!.channels!.slate, 'slate:all');
       expect(token.matchChannel(7), 'match:7');
+      expect(token.modelFields, 'on');
       client.close();
+    });
+
+    test('getWsToken(modelFields: false) sends model_fields=off and follows '
+        'the score-only vocabulary', () async {
+      late http.Request seen;
+      final client = clientWith((req) async {
+        seen = req;
+        return _ok(wsTokenScoreOnlyBody);
+      });
+      final token = await client.getWsToken(modelFields: false);
+      expect(seen.url.path, '/api/public/v1/ws-token');
+      expect(seen.url.queryParameters['model_fields'], 'off');
+      expect(token!.modelFields, 'off');
+      expect(token.channels!.slate, 'slate:score_only');
+      expect(token.matchChannel(7), 'match:7:score_only');
+      client.close();
+    });
+
+    test('WsToken tolerates a server without the model_fields echo', () {
+      final token = WsToken.fromJson({
+        'token': 't',
+        'channels': {'match': 'match:{id}', 'slate': 'slate:all'},
+      });
+      expect(token.modelFields, isNull);
+      expect(token.matchChannel(7), 'match:7');
     });
 
     test('listHistoryPackages omits the default kind and sends year',

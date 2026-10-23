@@ -1652,8 +1652,11 @@ class RankingRecord {
 }
 
 /// The channel vocabulary of the push WebSocket feed.
+///
+/// Minted with `modelFields: false`, [match] and [slate] name the score-only
+/// pair instead: `match:{match_id}:score_only` and `slate:score_only`.
 class WsChannels {
-  /// The per-match channel template, e.g. `match:{id}`. Use
+  /// The per-match channel template, e.g. `match:{match_id}`. Use
   /// [WsToken.matchChannel] to substitute a match id.
   final String? match;
 
@@ -1691,6 +1694,13 @@ class WsToken {
   /// The channel vocabulary: a per-match template and the slate channel.
   final WsChannels? channels;
 
+  /// Echo of the `model_fields` switch the token was minted with (since
+  /// 2026-10-23): `off` means [channels] names the score-only streams, one
+  /// `model: off` frame per state with the model keys left out; `on` (the
+  /// default) means the score channels, every state as `pending` then
+  /// `ready`. `null` on a server that predates the switch.
+  final String? modelFields;
+
   /// The exact map this token was decoded from.
   final Map<String, dynamic> raw;
 
@@ -1700,6 +1710,7 @@ class WsToken {
     this.expiresIn,
     this.wsUrl,
     this.channels,
+    this.modelFields,
     this.raw = const {},
   });
 
@@ -1711,14 +1722,17 @@ class WsToken {
       expiresIn: _asInt(json['expires_in']),
       wsUrl: _asString(json['ws_url']),
       channels: channels == null ? null : WsChannels.fromJson(channels),
+      modelFields: _asString(json['model_fields']),
       raw: json,
     );
   }
 
-  /// The concrete channel name for one match, from the `match:{id}` template
-  /// (`null` when the template is unknown).
+  /// The concrete channel name for one match, from the server's template
+  /// (`null` when the template is unknown). The placeholder is whatever the
+  /// server wrote between braces — `match:{match_id}` on the wire today — so
+  /// the substitution never depends on its spelling.
   String? matchChannel(int matchId) =>
-      channels?.match?.replaceFirst('{id}', '$matchId');
+      channels?.match?.replaceFirst(RegExp(r'\{[^{}]*\}'), '$matchId');
 }
 
 /// One file of a published bulk package.

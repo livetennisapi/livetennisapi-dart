@@ -18,6 +18,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   not shift left. `serveReturn` carries `matches_incomplete`, the matches
   whose measured statistics stop short of the final and are left out of
   every sum.
+- **Score first.** Since 2026-10-23 every push-feed `score` frame carries
+  `model` beside `score` and a state leaves twice: `pending` the instant it
+  is accepted (the four model keys present and null) and `ready` once its
+  model run finished, both with the same `score.sequence`. Dedup on
+  `(match_id, score.sequence, model)`, and read a frame with no `model` as
+  `ready`. `getWsToken(modelFields: false)` mints with `?model_fields=off`
+  for the score-only channels (one `off` frame per state, model keys left
+  out), which `WsToken.channels` then names, and `WsToken.modelFields`
+  echoes the switch.
+
+### Fixed
+
+- `WsToken.matchChannel` substitutes whatever placeholder the server wrote
+  between braces. The wire template is `match:{match_id}`, and the method
+  only replaced `{id}`, so it handed back the template unchanged.
 - `Player.heightCm` (`height_cm`) and `Player.doublesRanking`
   (`doubles_ranking`): set by `getPlayer` on paid tiers, `null` on a FREE key.
 

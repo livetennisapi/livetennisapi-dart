@@ -116,8 +116,21 @@ Full parity with the documented public v1 REST surface:
 | `getMatchRally` | `/history/matches/{id}/rally` | ULTRA |
 | `getChartingPlayer` | `/charting/players` | ULTRA |
 | `getChartingMatch` | `/charting/matches/{id}` | ULTRA |
-| `getWsToken` | `/ws-token` | ULTRA |
+| `getWsToken({modelFields})` | `/ws-token` | ULTRA |
 | `createWebhook`, `listWebhooks`, `deleteWebhook` | `/webhooks` | ULTRA (direct keys only) |
+
+**Score first (since 2026-10-23).** Every state leaves the push feed's score
+channels twice, and every `score` frame carries `model` beside `score`:
+`pending` the instant the state is accepted (the four model keys
+`win_probability_p1`, `danger`, `win_probability_p1_model`,
+`win_probability_meta` present and null) and `ready` once its model run
+finished, both with the same `score.sequence`. Dedup on
+`(match_id, score.sequence, model)`, apply each frame to the `sequence` it
+names, and read a frame with no `model` as `ready`. If you do not use the
+model fields, `getWsToken(modelFields: false)` mints with `?model_fields=off`:
+`channels` then names the score-only pair (`match:{match_id}:score_only` /
+`slate:score_only`), one `off` frame per state with the model keys left out,
+and `modelFields` echoes `off`.
 
 A call above your tier throws `UpgradeRequiredException`, whose `requiredTier`
 names the plan that unlocks the endpoint.
