@@ -16,3 +16,8 @@ updates:
     groups:
       pub-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # lints 6.x needs Dart SDK ^3.8.0 and pubspec.yaml still supports ^3.5.0.
+      # Drop this rule when the sdk floor in pubspec.yaml moves to >=3.8.0.
+      - dependency-name: lints
+        update-types: [version-update:semver-major]
