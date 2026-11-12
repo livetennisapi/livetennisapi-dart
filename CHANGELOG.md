@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- `Fixture` now types all 20 fields of API spec 1.13.82. Seven are new on the
+  API side: `reason` (`walkover`, `retired`, `cancelled`, `default` or
+  `postponed`), `matchId` (`match_id`: the id of the match the fixture
+  became, `null` until one exists), `gender` (`men` or `women`, `null` for
+  mixed events), `isQualifying`, `createdAt`, `updatedAt` and
+  `pregameForecasts`. Four older fields were never typed here and are added
+  too: `startTime`, `player1Id`, `player2Id` and `roundCode`. `isQualifying`
+  is `bool?`: `null` means never stated, and `null` is not `false`.
+  `pregameForecasts` is ULTRA only and absent below ULTRA, so `null` means
+  "not entitled" and an empty list means "no forecast yet".
+- `Match.isQualifying` and `Match.pregameForecasts`, with the same meaning.
+  `pregameForecasts` rides on ULTRA upcoming list rows only.
+
+All of these were already readable through `raw`. They are now typed and
+documented.
+
 ## 1.3.0 — 2026-09-02
 
 ### Added
