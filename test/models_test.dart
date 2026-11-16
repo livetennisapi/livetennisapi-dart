@@ -156,6 +156,67 @@ void main() {
     });
   });
 
+  group('Fixture fields (spec 1.13.82)', () {
+    test('every typed field decodes', () {
+      final f = Fixture.fromJson(
+        _json(
+          '{"id": 87, "event_date": "2026-09-25",'
+          ' "start_time": "2026-09-25T11:00:00Z",'
+          ' "player1_id": 925, "player2_id": null, "round_code": "QF",'
+          ' "status": "cancelled", "reason": "walkover", "match_id": 48213,'
+          ' "gender": "women", "is_qualifying": false,'
+          ' "created_at": "2026-09-23T08:00:00Z",'
+          ' "updated_at": "2026-09-24T10:30:00Z",'
+          ' "pregame_forecasts": [{"win_probability_p1": 0.61,'
+          ' "stage": "pregame"}]}',
+        ),
+      );
+      expect(f.startTime, DateTime.utc(2026, 9, 25, 11));
+      expect(f.player1Id, 925);
+      expect(f.player2Id, isNull);
+      expect(f.roundCode, 'QF');
+      expect(f.reason, 'walkover');
+      expect(f.matchId, 48213);
+      expect(f.gender, 'women');
+      // A present `false` must stay `false`, never collapse to null.
+      expect(f.isQualifying, isFalse);
+      expect(f.createdAt, DateTime.utc(2026, 9, 23, 8));
+      expect(f.updatedAt, DateTime.utc(2026, 9, 24, 10, 30));
+      expect(f.pregameForecasts, hasLength(1));
+      expect(f.pregameForecasts!.first['win_probability_p1'], 0.61);
+      expect(f.pregameForecasts!.first['stage'], 'pregame');
+    });
+
+    test('null stays null: no match yet, a mixed event, a draw never stated',
+        () {
+      final f = Fixture.fromJson(
+        _json(
+          '{"id": 88, "start_time": null, "reason": null, "match_id": null,'
+          ' "gender": null, "is_qualifying": null, "created_at": null,'
+          ' "updated_at": null, "pregame_forecasts": []}',
+        ),
+      );
+      expect(f.startTime, isNull);
+      expect(f.reason, isNull);
+      expect(f.matchId, isNull);
+      expect(f.gender, isNull);
+      // Null means never stated, and null is not false.
+      expect(f.isQualifying, isNull);
+      expect(f.createdAt, isNull);
+      expect(f.updatedAt, isNull);
+      // An empty list is "no forecast yet" and stays a list.
+      expect(f.pregameForecasts, isEmpty);
+    });
+
+    test('pregameForecasts is null when the field is absent (below ULTRA)',
+        () {
+      final f = Fixture.fromJson(_json('{"id": 89}'));
+      expect(f.pregameForecasts, isNull);
+      expect(f.isQualifying, isNull);
+      expect(f.matchId, isNull);
+    });
+  });
+
   group('Market', () {
     test('prices decode into models; missing prices is an empty list', () {
       final m = Market.fromJson(_json(
@@ -229,6 +290,31 @@ void main() {
       // An older server sends neither flag: null, not a guessed false.
       expect(m.hasAnalysis, isNull);
       expect(m.hasMarket, isNull);
+      // Never stated is null, and absent forecasts are null, not empty.
+      expect(m.isQualifying, isNull);
+      expect(m.pregameForecasts, isNull);
+    });
+
+    test('isQualifying is three-valued and pregameForecasts decodes', () {
+      final m = Match.fromJson(
+        _json(
+          '{"id": 1, "is_qualifying": true,'
+          ' "pregame_forecasts": [{"win_probability_p1": 0.58}]}',
+        ),
+      );
+      expect(m.isQualifying, isTrue);
+      expect(m.pregameForecasts, hasLength(1));
+      expect(m.pregameForecasts!.first['win_probability_p1'], 0.58);
+
+      final mainDraw = Match.fromJson(
+        _json('{"id": 2, "is_qualifying": false, "pregame_forecasts": []}'),
+      );
+      // A present `false` must stay `false`, and an empty list stays a list.
+      expect(mainDraw.isQualifying, isFalse);
+      expect(mainDraw.pregameForecasts, isEmpty);
+
+      final unstated = Match.fromJson(_json('{"id": 3, "is_qualifying": null}'));
+      expect(unstated.isQualifying, isNull);
     });
   });
 

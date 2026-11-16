@@ -69,6 +69,16 @@ List<List<int>>? _asGames(Object? v) {
 Map<String, dynamic>? _asMap(Object? v) =>
     v is Map ? Map<String, dynamic>.from(v) : null;
 
+/// A list of JSON objects, dropping anything that is not an object. `null`
+/// when the value is absent or not a list, so "absent" and "empty" stay apart.
+List<Map<String, dynamic>>? _asMapList(Object? v) {
+  if (v is! List) return null;
+  return [
+    for (final e in v)
+      if (_asMap(e) case final m?) m
+  ];
+}
+
 // -- models -------------------------------------------------------------------
 
 /// Pagination envelope returned alongside list responses.
@@ -549,7 +559,11 @@ class MatchEvent {
       );
 }
 
-/// A scheduled fixture. Players are names only — not yet resolved to ids.
+/// A scheduled fixture.
+///
+/// Names are always present. [player1Id] and [player2Id] are our roster ids
+/// where the participant resolves by exact key — `null` otherwise, which is a
+/// real state, not an omission.
 ///
 /// Note the API's `/fixtures` endpoint may currently include some finished
 /// matches; this client passes them through unchanged.
@@ -560,6 +574,17 @@ class Fixture {
   /// Scheduled date, or `null`.
   final DateTime? eventDate;
 
+  /// Scheduled start, UTC. `null` until the order of play assigns a time — a
+  /// date-only fixture is a real state.
+  final DateTime? startTime;
+
+  /// Player 1's roster id, when the participant is in our roster. `null`
+  /// otherwise.
+  final int? player1Id;
+
+  /// Player 2's roster id, or `null`. See [player1Id].
+  final int? player2Id;
+
   /// The record's own, granular tour string (opaque; see [Player.tour]).
   final String? tour;
 
@@ -568,6 +593,10 @@ class Fixture {
 
   /// Round, or `null`.
   final String? round;
+
+  /// The normalised round, in the same vocabulary as [Match.roundCode].
+  /// `null` when the label is unrecognised — never guessed.
+  final String? roundCode;
 
   /// Surface, or `null`.
   final String? surface;
@@ -581,6 +610,44 @@ class Fixture {
   /// Status string, or `null`.
   final String? status;
 
+  /// Why a fixture ended without being played out: `walkover`, `retired`,
+  /// `cancelled`, `default` or `postponed`. [status] folds the first four
+  /// into `cancelled`; this field names which one. `null` on a scheduled,
+  /// live or finished fixture.
+  final String? reason;
+
+  /// The id of the match this fixture became, which every match method
+  /// accepts. `null` while no match exists yet — a fixture can publish days
+  /// before its match. Set when found and never cleared.
+  final int? matchId;
+
+  /// The sex of the event: `men` or `women`. `null` for mixed doubles and
+  /// mixed team events.
+  final String? gender;
+
+  /// Whether the fixture is in the qualifying draw. Three-valued, like
+  /// [Match.isQualifying]: `null` means never stated, and `null` is not
+  /// `false`. The qualifying draw is published under the main draw's
+  /// tournament name, so group a schedule on [roundCode] and this flag
+  /// together.
+  final bool? isQualifying;
+
+  /// When this row first existed, UTC. A value inside your polling window is
+  /// a new row.
+  final DateTime? createdAt;
+
+  /// When this row last changed, UTC. A moved value with [createdAt]
+  /// unchanged is a change to a row you already hold, such as a re-listed
+  /// start time.
+  final DateTime? updatedAt;
+
+  /// The bound match's pre-match forecasts, oldest first (the [Analysis]
+  /// `profile` shape), kept as raw maps. ULTRA tier only. The field is absent
+  /// below ULTRA and decodes to `null`, so `null` means "not entitled", never
+  /// "no forecast". Empty when the fixture has no [matchId] yet or no
+  /// forecast has been written.
+  final List<Map<String, dynamic>>? pregameForecasts;
+
   /// The exact map this fixture was decoded from.
   final Map<String, dynamic> raw;
 
@@ -588,13 +655,24 @@ class Fixture {
   const Fixture({
     this.id,
     this.eventDate,
+    this.startTime,
+    this.player1Id,
+    this.player2Id,
     this.tour,
     this.tournament,
     this.round,
+    this.roundCode,
     this.surface,
     this.player1Name,
     this.player2Name,
     this.status,
+    this.reason,
+    this.matchId,
+    this.gender,
+    this.isQualifying,
+    this.createdAt,
+    this.updatedAt,
+    this.pregameForecasts,
     this.raw = const {},
   });
 
@@ -602,13 +680,24 @@ class Fixture {
   factory Fixture.fromJson(Map<String, dynamic> json) => Fixture(
         id: _asInt(json['id']),
         eventDate: _asDateTime(json['event_date']),
+        startTime: _asDateTime(json['start_time']),
+        player1Id: _asInt(json['player1_id']),
+        player2Id: _asInt(json['player2_id']),
         tour: _asString(json['tour']),
         tournament: _asString(json['tournament']),
         round: _asString(json['round']),
+        roundCode: _asString(json['round_code']),
         surface: _asString(json['surface']),
         player1Name: _asString(json['player1_name']),
         player2Name: _asString(json['player2_name']),
         status: _asString(json['status']),
+        reason: _asString(json['reason']),
+        matchId: _asInt(json['match_id']),
+        gender: _asString(json['gender']),
+        isQualifying: _asBool(json['is_qualifying']),
+        createdAt: _asDateTime(json['created_at']),
+        updatedAt: _asDateTime(json['updated_at']),
+        pregameForecasts: _asMapList(json['pregame_forecasts']),
         raw: json,
       );
 }
@@ -711,6 +800,18 @@ class Match {
   /// answers `404 no_market`. `null` when talking to an older server.
   final bool? hasMarket;
 
+  /// Whether this match belongs to the qualifying draw. Three-valued: `null`
+  /// means never stated, and `null` is not `false`. The qualifying draw
+  /// shares the main draw's tournament name and round vocabulary, so branch
+  /// on [roundCode] and this flag together.
+  final bool? isQualifying;
+
+  /// The match's pre-match forecasts, oldest first (the [Analysis] `profile`
+  /// shape), kept as raw maps. ULTRA tier only, on upcoming list rows. The
+  /// field is absent below ULTRA and on other statuses, and decodes to
+  /// `null`. Empty when no forecast has been written yet.
+  final List<Map<String, dynamic>>? pregameForecasts;
+
   /// Embedded market. PRO tier and above; `null` below.
   final Market? market;
 
@@ -743,6 +844,8 @@ class Match {
     this.withdrew,
     this.hasAnalysis,
     this.hasMarket,
+    this.isQualifying,
+    this.pregameForecasts,
     this.market,
     this.analysis,
     this.raw = const {},
@@ -778,6 +881,8 @@ class Match {
       withdrew: _asInt(json['withdrew']),
       hasAnalysis: _asBool(json['has_analysis']),
       hasMarket: _asBool(json['has_market']),
+      isQualifying: _asBool(json['is_qualifying']),
+      pregameForecasts: _asMapList(json['pregame_forecasts']),
       market: market == null ? null : Market.fromJson(market),
       analysis: analysis == null ? null : Analysis.fromJson(analysis),
       raw: json,
